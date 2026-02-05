@@ -87,13 +87,9 @@ try {
         }
     }
 
-    // ✅ Ajuste de hora local: definimos Bogotá y guardamos la hora actual
-    date_default_timezone_set('America/Bogota');
-    $fechaLocal = date('Y-m-d H:i:s');
-
-    // ✅ Crear orden con hora local en lugar de NOW()
-    $stmt = $pdo->prepare("INSERT INTO orders (user_id, branch_id, total, status, payment_method, transaction_ref, created_at) VALUES (?, ?, 0, 'completado', ?, ?, ?)");
-    $stmt->execute([$_SESSION['user']['id'], $branch_id, $payment_method, $transaction_ref, $fechaLocal]);
+    // Crear orden
+    $stmt = $pdo->prepare("INSERT INTO orders (user_id, branch_id, total, status, payment_method, transaction_ref, created_at) VALUES (?, ?, 0, 'completado', ?, ?, NOW())");
+    $stmt->execute([$_SESSION['user']['id'], $branch_id, $payment_method, $transaction_ref]);
     $order_id = $pdo->lastInsertId();
 
     $total = 0;
@@ -131,14 +127,12 @@ try {
         $stmt = $pdo->prepare("UPDATE inventory SET quantity = quantity - ? WHERE product_id = ? AND branch_id = ?");
         $stmt->execute([$qty * $unit_qty, $pid, $branch_id]);
 
-        // ✅ Movimiento de inventario con hora local
-        $stmt = $pdo->prepare("INSERT INTO inventory_movements (product_id, branch_id, user_id, type, quantity, note, created_at) VALUES (?, ?, ?, 'salida', ?, 'Venta POS', ?)");
-        $stmt->execute([$pid, $branch_id, $_SESSION['user']['id'], $qty * $unit_qty, $fechaLocal]);
+        $stmt = $pdo->prepare("INSERT INTO inventory_movements (product_id, branch_id, user_id, type, quantity, note, created_at) VALUES (?, ?, ?, 'salida', ?, 'Venta POS', NOW())");
+        $stmt->execute([$pid, $branch_id, $_SESSION['user']['id'], $qty * $unit_qty]);
     }
 
     $stmt = $pdo->prepare("UPDATE orders SET total = ? WHERE id = ?");
     $stmt->execute([$total, $order_id]);
-
     // Validación: pagos deben cubrir el total
     $sumPayments = 0;
     if (!empty($payments) && is_array($payments)) {
@@ -150,7 +144,7 @@ try {
         throw new RuntimeException('La suma de pagos es insuficiente para cubrir el total');
     }
 
-    // ✅ Registrar pagos en tabla payments con hora local
+    // Registrar pagos en tabla payments
     if (!empty($payments) && is_array($payments)) {
         foreach ($payments as $p) {
             if (!isset($p['amount'])) continue;
@@ -169,7 +163,7 @@ try {
             try {
                 $stmt = $pdo->prepare("
                     INSERT INTO payments (order_id, amount, method, reference, status, cash_received, change_given, user_id, created_at)
-                    VALUES (?, ?, ?, ?, 'completado', ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, 'completado', ?, ?, ?, NOW())
                 ");
                 $stmt->execute([
                     $order_id,
@@ -178,8 +172,7 @@ try {
                     $ref,
                     $cash_received,
                     $change_given,
-                    $_SESSION['user']['id'],
-                    $fechaLocal // ✅ Hora local en lugar de NOW()
+                    $_SESSION['user']['id']
                 ]);
             } catch (\Throwable $e) {
                 error_log("checkout.php payments insert error: " . $e->getMessage());
