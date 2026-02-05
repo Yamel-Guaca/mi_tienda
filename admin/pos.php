@@ -11,7 +11,9 @@ require_role([1, 3]);
 
 $pdo = DB::getConnection();
 
-// ✅ Sucursal activa desde sesión
+// ✅ Ajuste de hora local: definimos Bogotá
+date_default_timezone_set('America/Bogota');
+
 $currentBranchId   = $_SESSION['branch_id']   ?? null;
 $currentBranchName = $_SESSION['branch_name'] ?? null;
 
@@ -74,9 +76,10 @@ if ($action === "sell" && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $cashReceived = floatval($_POST['cash_received']);
             if ($cashReceived > 0) {
                 $changeGiven = max(0, $cashReceived - $total);
+                $fechaLocal = date('Y-m-d H:i:s'); // Hora Bogotá
                 $stmt = $pdo->prepare("INSERT INTO payments (order_id, method, amount, cash_received, change_given, status, user_id, created_at) 
-                                       VALUES (?, 'efectivo', ?, ?, ?, 'completado', ?, NOW())");
-                $stmt->execute([$order_id, $total, $cashReceived, $changeGiven, $_SESSION['user']['id']]);
+                                       VALUES (?, 'efectivo', ?, ?, ?, 'completado', ?, ?)");
+                $stmt->execute([$order_id, $total, $cashReceived, $changeGiven, $_SESSION['user']['id'], $fechaLocal]);
             }
         }
 
@@ -84,9 +87,10 @@ if ($action === "sell" && $_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!empty($_POST['virtual_received'])) {
             $virtualReceived = floatval($_POST['virtual_received']);
             if ($virtualReceived > 0) {
+                $fechaLocal = date('Y-m-d H:i:s'); // Hora Bogotá
                 $stmt = $pdo->prepare("INSERT INTO payments (order_id, method, amount, status, user_id, created_at) 
-                                       VALUES (?, 'virtual', ?, 'completado', ?, NOW())");
-                $stmt->execute([$order_id, $virtualReceived, $_SESSION['user']['id']]);
+                                       VALUES (?, 'virtual', ?, 'completado', ?, ?)");
+                $stmt->execute([$order_id, $virtualReceived, $_SESSION['user']['id'], $fechaLocal]);
             }
         }
 
@@ -158,7 +162,7 @@ if ($currentSubcategoryId > 0) {
         WHERE p.active = 1 AND p.subcategory_id = ?
         ORDER BY p.name
     ");
-    $stmt->execute([$currentBranchId, $currentSubcategoryId]);
+    $stmt->execute([$currentBranchId, $currentCategoryId]);
     $products_base = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $stmt = $pdo->prepare("
@@ -182,6 +186,7 @@ if ($currentSubcategoryId > 0) {
     $products = array_merge($products_base, $products_tiers);
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="es">
 <head>

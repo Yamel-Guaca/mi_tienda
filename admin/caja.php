@@ -14,6 +14,9 @@ require_role([1, 3]);
 
 $pdo = DB::getConnection();
 
+// Ajuste de hora local
+date_default_timezone_set('America/Bogota');
+
 $currentBranchId   = $_SESSION['branch_id']   ?? null;
 $currentBranchName = $_SESSION['branch_name'] ?? null;
 $currentUserId     = $_SESSION['user']['id']  ?? null;
@@ -27,36 +30,31 @@ $msg = "";
 $diferencia = null;
 $action = $_POST['action'] ?? null;
 
-// --- Handler mínimo para ack_report (pegar aquí, justo después de obtener $pdo) ---
+// --- Handler mínimo para ack_report ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'ack_report')) {
     $sessionId = intval($_POST['session_id'] ?? 0);
     if ($sessionId > 0) {
-        // Asegúrate de que las columnas existan en la BD:
-        // ALTER TABLE cash_sessions ADD COLUMN report_acknowledged TINYINT(1) DEFAULT 0;
-        // ALTER TABLE cash_sessions ADD COLUMN report_acknowledged_at DATETIME NULL;
         try {
-            $stmtAck = $pdo->prepare("UPDATE cash_sessions SET report_acknowledged = 1, report_acknowledged_at = NOW() WHERE id = ?");
-            $stmtAck->execute([$sessionId]);
+            $fechaLocal = date('Y-m-d H:i:s'); // Hora Bogotá
+            $stmtAck = $pdo->prepare("UPDATE cash_sessions SET report_acknowledged = 1, report_acknowledged_at = ? WHERE id = ?");
+            $stmtAck->execute([$fechaLocal, $sessionId]);
         } catch (Exception $e) {
             // No interrumpir la UX si falla; opcionalmente loguear el error en tu sistema de logs.
         }
     }
-    // Redirigir para evitar reenvío del formulario y limpiar POST
     header("Location: caja.php");
     exit;
 }
 // --- fin handler ack_report ---
 
-// --- Handler mínimo para ack_print_order (marcar que no se imprimió la factura de la orden) ---
+// --- Handler mínimo para ack_print_order ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'ack_print_order')) {
     $orderId = intval($_POST['order_id'] ?? 0);
     if ($orderId > 0) {
-        // Opcional: crea columnas en orders: print_acknowledged TINYINT(1) DEFAULT 0, print_acknowledged_at DATETIME NULL
-        // ALTER TABLE orders ADD COLUMN print_acknowledged TINYINT(1) DEFAULT 0;
-        // ALTER TABLE orders ADD COLUMN print_acknowledged_at DATETIME NULL;
         try {
-            $stmtAckOrder = $pdo->prepare("UPDATE orders SET print_acknowledged = 1, print_acknowledged_at = NOW() WHERE id = ?");
-            $stmtAckOrder->execute([$orderId]);
+            $fechaLocal = date('Y-m-d H:i:s'); // Hora Bogotá
+            $stmtAckOrder = $pdo->prepare("UPDATE orders SET print_acknowledged = 1, print_acknowledged_at = ? WHERE id = ?");
+            $stmtAckOrder->execute([$fechaLocal, $orderId]);
         } catch (Exception $e) {
             // No interrumpir la UX si falla; opcionalmente loguear
         }
@@ -66,8 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'ack_print_order')) {
 }
 // --- fin handler ack_print_order ---
 
-// Detectar si se pasó un lastOrderId (mínimo cambio para mostrar botones tras guardar la venta)
-// Esto permite que el flujo que crea la orden redirija a caja.php?last_order_id=123
+// Detectar si se pasó un lastOrderId
 $lastOrderId = intval($_GET['last_order_id'] ?? $_POST['last_order_id'] ?? 0);
 
 // Caja abierta actual del usuario
@@ -79,7 +76,7 @@ $stmt = $pdo->prepare("
 $stmt->execute([$currentUserId, $currentBranchId]);
 $currentSession = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// Preparar consulta para ventas por sesión (entre apertura y cierre)
+// Preparar consulta para ventas por sesión
 $stmtVentasSesion = $pdo->prepare("
     SELECT SUM(total)
     FROM orders
@@ -88,7 +85,6 @@ $stmtVentasSesion = $pdo->prepare("
       AND created_at BETWEEN ? AND ?
 ");
 
-// Variable para mostrar reporte después de cerrar
 $reportSession = null;
 $reportVentas  = 0;
 
@@ -111,35 +107,30 @@ if ($action === 'open' && !$currentSession) {
 
 // Cierre
 if ($action === 'close' && $currentSession) {
-    // Tomar el monto de cierre enviado por el formulario
     $closing = floatval(str_replace('.', '', $_POST['closing_amount'] ?? 0));
     $diferencia = $closing - $currentSession['opening_amount'];
 
-    // Actualizar la sesión en la base de datos
+    $fechaLocal = date('Y-m-d H:i:s'); // Hora Bogotá
     $stmt = $pdo->prepare("
         UPDATE cash_sessions
-        SET closing_amount=?, closed_at=NOW(), status='cerrada'
+        SET closing_amount=?, closed_at=?, status='cerrada'
         WHERE id=?
     ");
-    $stmt->execute([$closing, $currentSession['id']]);
+    $stmt->execute([$closing, $fechaLocal, $currentSession['id']]);
 
-    // Recuperar la sesión actualizada para el reporte
     $stmt2 = $pdo->prepare("SELECT c.*, u.name AS user_name FROM cash_sessions c JOIN users u ON u.id = c.user_id WHERE c.id = ? LIMIT 1");
     $stmt2->execute([$currentSession['id']]);
     $reportSession = $stmt2->fetch(PDO::FETCH_ASSOC);
 
-    // Calcular ventas dentro del rango de la sesión (apertura -> cierre)
     $openedAt = $reportSession['opened_at'];
     $closedAt = $reportSession['closed_at'] ?: date('Y-m-d H:i:s');
     $stmtVentasSesion->execute([$currentBranchId, $openedAt, $closedAt]);
     $reportVentas = $stmtVentasSesion->fetchColumn() ?: 0;
 
-    // Preparar mensaje y NO redirigir: mostramos el reporte en la misma vista
     $msg = "Caja cerrada correctamente. Generando reporte de cierre.";
-    // Nota: no hacemos header redirect para que el cajero vea el reporte inmediatamente
 }
 
-// Ventas del día de esa sucursal
+// Ventas del día
 $stmt = $pdo->prepare("
     SELECT SUM(total) 
     FROM orders
@@ -150,7 +141,7 @@ $stmt = $pdo->prepare("
 $stmt->execute([$currentBranchId]);
 $todaySales = $stmt->fetchColumn() ?: 0;
 
-// Últimas sesiones de caja
+// Últimas sesiones
 $stmt = $pdo->prepare("
     SELECT c.*, u.name AS user_name
     FROM cash_sessions c
@@ -162,6 +153,7 @@ $stmt = $pdo->prepare("
 $stmt->execute([$currentBranchId]);
 $sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
