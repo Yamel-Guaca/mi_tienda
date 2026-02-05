@@ -3,6 +3,9 @@
 session_start();
 require_once __DIR__ . '/../includes/db.php';
 
+// Asegurar zona por defecto para funciones de fecha en PHP
+date_default_timezone_set('America/Bogota');
+
 // ✅ Validar sesión iniciada
 if (!isset($_SESSION['user'])) {
     header("Location: login.php");
@@ -29,14 +32,14 @@ th { background: #f2f2f2; }
 .btn-danger:hover { background: #c9302c; }
 .btn-secondary { background: #5bc0de; color: #fff; }
 .btn-secondary:hover { background: #31b0d5; }
+.small { font-size: 0.9em; color: #666; }
 </style>
 </head>
 <body>
 <h1>📋 Listado de Facturas</h1>
 <!-- ✅ ENLACES RÁPIDOS COMPLETOS -->
-    <p class="small" style="margin-top:12px;">Enlaces rápidos: 
+    <p class="small" style="margin-top:12px;">Enlaces rápidos:
       <a href="/mi_tienda/admin/pos.php">Atras</a> ·
-      
     </p>
 
 <table>
@@ -52,16 +55,39 @@ th { background: #f2f2f2; }
   </thead>
   <tbody>
     <?php foreach ($orders as $order): ?>
+      <?php
+        // Intentamos parsear created_at como 'Y-m-d H:i:s'
+        // Asumimos que el valor en la base está en UTC y lo convertimos a America/Bogota.
+        // Si tus valores ya están en hora local, elimina la conversión y muestra $order['created_at'] directamente.
+        $displayDate = htmlspecialchars($order['created_at']);
+        if (!empty($order['created_at'])) {
+            $dt = DateTime::createFromFormat('Y-m-d H:i:s', $order['created_at'], new DateTimeZone('UTC'));
+            if ($dt !== false) {
+                $dt->setTimezone(new DateTimeZone('America/Bogota'));
+                $displayDate = $dt->format('Y-m-d H:i:s');
+            } else {
+                // Fallback: intentar crear DateTime sin formato estricto
+                try {
+                    $dt2 = new DateTime($order['created_at'], new DateTimeZone('UTC'));
+                    $dt2->setTimezone(new DateTimeZone('America/Bogota'));
+                    $displayDate = $dt2->format('Y-m-d H:i:s');
+                } catch (Exception $e) {
+                    // dejar el valor tal cual si no se puede parsear
+                    $displayDate = htmlspecialchars($order['created_at']);
+                }
+            }
+        }
+      ?>
       <tr>
         <td><?= htmlspecialchars($order['id']) ?></td>
         <td><?= htmlspecialchars($order['customer_name']) ?></td>
         <td>$<?= number_format($order['total'], 2, ",", ".") ?></td>
         <td><?= htmlspecialchars($order['status']) ?></td>
-        <td><?= htmlspecialchars($order['created_at']) ?></td>
+        <td><?= $displayDate ?></td>
         <td>
           <!-- Botón de reimpresión disponible para todos los roles -->
-          <a href="invoice_print.php?order_id=<?= $order['id'] ?>" 
-             target="_blank" 
+          <a href="invoice_print.php?order_id=<?= $order['id'] ?>"
+             target="_blank"
              class="btn btn-secondary">Reimprimir</a>
 
           <!-- Botón de anular solo para Administrador o Supervisor -->

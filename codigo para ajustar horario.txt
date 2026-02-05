@@ -1,0 +1,5 @@
+date_default_timezone_set('America/Bogota');
+$fechaLocal = date('Y-m-d H:i:s');
+
+$stmt = $pdo->prepare("INSERT INTO transfer_logs (transfer_id, action, user_id, created_at, details) VALUES (?, ?, ?, ?, ?)");
+$stmt->execute([$transferId, $action, $userId, $fechaLocal, $details]);
