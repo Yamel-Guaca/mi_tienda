@@ -1,7 +1,7 @@
 <?php
 // includes/config.php
 
-// ✅ Ajuste global de zona horaria (Colombia)
+// ✅ Ajuste global de zona horaria (Colombia) en PHP
 date_default_timezone_set("America/Bogota");
 
 // Datos de conexión a la base de datos
@@ -22,8 +22,8 @@ $options = [
 try {
     $pdo = new PDO("mysql:host=$servername;dbname=$database", $username, $password, $options);
 
-    // ✅ Ajuste de zona horaria también en MySQL
-    $pdo->exec("SET time_zone = 'America/Bogota'");
+    // ✅ Ajuste de zona horaria en MySQL usando offset UTC-5
+    $pdo->exec("SET time_zone = '-05:00'");
 } catch (PDOException $e) {
     die("Error de conexión: " . $e->getMessage());
 }
