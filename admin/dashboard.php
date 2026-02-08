@@ -157,7 +157,7 @@ try {
      <a href="/mi_tienda/admin/kardex.php">Kardex</a> · 
      <a href="/mi_tienda/admin/categorias.php">Categorías</a> · 
       <a href="/mi_tienda/admin/subcategorias.php">Subcategorías</a> · 
-      <a href="/mi_tienda/admin/pedidos.php">Pedidos</a> · 
+      <a href="/mi_tienda/admin/prueba.php">Pedidos</a> · 
       <a href="/mi_tienda/admin/cierres_diarios.php">Cierres diarios</a> · 
       <a href="/mi_tienda/admin/usuarios.php">Usuarios</a> · 
       <a href="/mi_tienda/admin/sucursales.php">Sucursales</a> · 
