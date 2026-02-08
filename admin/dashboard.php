@@ -157,7 +157,7 @@ try {
      <a href="/mi_tienda/admin/kardex.php">Kardex</a> · 
      <a href="/mi_tienda/admin/categorias.php">Categorías</a> · 
       <a href="/mi_tienda/admin/subcategorias.php">Subcategorías</a> · 
-      <a href="/mi_tienda/admin/prueba.php">Pedidos</a> · 
+      <a href="/mi_tienda/admin/pedidos.php">Pedidos</a> · 
       <a href="/mi_tienda/admin/cierres_diarios.php">Cierres diarios</a> · 
       <a href="/mi_tienda/admin/usuarios.php">Usuarios</a> · 
       <a href="/mi_tienda/admin/sucursales.php">Sucursales</a> · 
@@ -167,7 +167,7 @@ try {
       <a href="/mi_tienda/admin/reportes_ganancias.php" class="btn">Reporte de Ganancias</a>       
       <a href="/mi_tienda/admin/invoices_list.php" class="btn">Borrar Factura</a>
       <a href="/mi_tienda/admin/branch_visibility.php" class="btn">Visibilidad de Categorías y Subcategorías por Sucursal</a>
-      <a href="/mi_tienda/admin/prueba.php" class="btn">Vi</a>
+      <a href="/mi_tienda/admin/prueba.php" class="btn">prueba</a>
     </p>
 
   <div class="container">
