@@ -1022,6 +1022,14 @@ document.addEventListener('DOMContentLoaded', function(){
 })();
 </script>
 
+<!-- Buscador en vivo -->
+<div style="margin:12px 0; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+  <input id="product_search" type="search" placeholder="Buscar por nombre, SKU, categoría o subcategoría" style="flex:1; min-width:220px; padding:8px; border-radius:6px; border:1px solid #ddd;">
+  <button id="product_search_btn" class="btn">Buscar</button>
+  <button id="product_clear_btn" class="btn">Limpiar</button>
+  <div id="product_search_info" class="small" style="margin-left:auto; opacity:0.85;"></div>
+</div>
+
 <h3>Lista de Productos</h3>
 <table>
     <thead>
@@ -1065,6 +1073,123 @@ document.addEventListener('DOMContentLoaded', function(){
         <?php endforeach; ?>
     </tbody>
 </table>
+
+<script>
+/* Búsqueda en vivo (AJAX) con debounce y render en la tabla */
+(function(){
+  const input = document.getElementById('product_search');
+  const btnSearch = document.getElementById('product_search_btn');
+  const btnClear = document.getElementById('product_clear_btn');
+  const info = document.getElementById('product_search_info');
+  const tbody = document.querySelector('table tbody');
+
+  if (!input || !tbody) return;
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function(m){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];
+    });
+  }
+
+  let debounceTimer = null;
+  const DEBOUNCE_MS = 300;
+
+  function renderRows(products) {
+    tbody.innerHTML = '';
+    if (!Array.isArray(products) || products.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; opacity:0.8;">No se encontraron productos</td></tr>';
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    products.forEach(p => {
+      const tr = document.createElement('tr');
+
+      const imgCell = p.main_image ? '<img class="thumb" src="/mi_tienda/uploads/products/'+escapeHtml(p.main_image)+'" alt="">' : '-';
+      const actions = '<a class="btn btn-edit" href="/mi_tienda/admin/productos.php?action=edit&id='+p.id+'">Editar</a> ' +
+                      '<a class="btn btn-toggle" href="/mi_tienda/admin/productos.php?action=toggle&id='+p.id+'">Activar/Desactivar</a> ' +
+                      '<a class="btn btn-delete" href="/mi_tienda/admin/productos.php?action=delete&id='+p.id+'" onclick="return confirm(\'¿Eliminar producto e imágenes?\')">Eliminar</a>';
+
+      tr.innerHTML = '<td>'+p.id+'</td>' +
+                     '<td>'+imgCell+'</td>' +
+                     '<td>'+escapeHtml(p.name)+'</td>' +
+                     '<td>'+escapeHtml(p.sku)+'</td>' +
+                     '<td>$'+Number(p.price).toFixed(2)+'</td>' +
+                     '<td>'+Number(p.min_quantity)+'</td>' +
+                     '<td>'+escapeHtml(p.category_name || '-')+'</td>' +
+                     '<td>'+escapeHtml(p.subcategory_name || '-')+'</td>' +
+                     '<td>'+(p.active ? '✅' : '❌')+'</td>' +
+                     '<td>'+actions+'</td>';
+      fragment.appendChild(tr);
+    });
+    tbody.appendChild(fragment);
+  }
+
+  function setInfo(text) {
+    if (info) info.textContent = text;
+  }
+
+  function fetchProducts(q) {
+    setInfo('Buscando...');
+    fetch('/mi_tienda/admin/ajax/search_products.php?q=' + encodeURIComponent(q))
+      .then(resp => {
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        return resp.json();
+      })
+      .then(data => {
+        if (data && Array.isArray(data)) {
+          renderRows(data);
+          setInfo(data.length + ' resultado(s)');
+        } else {
+          renderRows([]);
+          setInfo('Sin resultados');
+        }
+      })
+      .catch(err => {
+        console.error('search error', err);
+        setInfo('Error al buscar');
+      });
+  }
+
+  // Debounced input
+  input.addEventListener('input', function(){
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      const q = input.value.trim();
+      if (q.length === 0) {
+        // si vacío, recargar la página para volver al listado completo (opcional)
+        // window.location.reload();
+        // o pedir al servidor que devuelva los primeros N; aquí mostramos mensaje y no hacemos fetch
+        setInfo('Escribe para buscar');
+        // opcional: limpiar tabla o mantener la vista actual
+        return;
+      }
+      fetchProducts(q);
+    }, DEBOUNCE_MS);
+  });
+
+  // Botón buscar (inmediato)
+  btnSearch && btnSearch.addEventListener('click', function(){
+    clearTimeout(debounceTimer);
+    const q = input.value.trim();
+    if (q.length === 0) {
+      setInfo('Ingrese término de búsqueda');
+      return;
+    }
+    fetchProducts(q);
+  });
+
+  // Botón limpiar: recargar la página para volver al listado completo
+  btnClear && btnClear.addEventListener('click', function(){
+    input.value = '';
+    setInfo('');
+    // Recargar para volver al listado original (más simple)
+    window.location.href = window.location.pathname;
+  });
+
+})();
+</script>
+
 
 </div> <!-- cierre container -->
 </body>
