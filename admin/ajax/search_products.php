@@ -24,7 +24,7 @@ try {
 
     // Preparar consulta segura (LIKE en columnas relevantes)
     $sql = "
-        SELECT p.id, p.name, p.sku, p.price, p.min_quantity, p.active,
+        SELECT p.id, p.name, p.sku, p.price, p.min_quantity, p.cost_initial, p.active,
                c.name AS category_name, s.name AS subcategory_name,
                (SELECT filename FROM product_images WHERE product_id=p.id AND is_main=1 LIMIT 1) AS main_image
         FROM products p
@@ -49,6 +49,7 @@ try {
             'sku' => $r['sku'] ?? '',
             'price' => isset($r['price']) ? (float)$r['price'] : 0.0,
             'min_quantity' => isset($r['min_quantity']) ? (int)$r['min_quantity'] : 0,
+            'cost_initial' => isset($r['cost_initial']) ? (float)$r['cost_initial'] : 0.0, // NUEVO CAMPO
             'active' => !empty($r['active']) ? 1 : 0,
             'category_name' => $r['category_name'] ?? '',
             'subcategory_name' => $r['subcategory_name'] ?? '',

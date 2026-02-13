@@ -1038,6 +1038,7 @@ document.addEventListener('DOMContentLoaded', function(){
             <th>Imagen</th>
             <th>Nombre</th>
             <th>SKU</th>
+            <th>Costo inicial</th> <!-- NUEVA COLUMNA -->
             <th>Precio</th>
             <th>Mínimo</th>
             <th>Categoría</th>
@@ -1059,6 +1060,7 @@ document.addEventListener('DOMContentLoaded', function(){
             </td>
             <td><?= htmlspecialchars($p['name']) ?></td>
             <td><?= htmlspecialchars($p['sku']) ?></td>
+            <td>$<?= number_format((float)($p['cost_initial'] ?? 0), 2) ?></td>
             <td>$<?= number_format((float)($p['price'] ?? 0), 2) ?></td>
             <td><?= (int)($p['min_quantity'] ?? 0) ?></td>
             <td><?= htmlspecialchars($p['category_name'] ?? '-') ?></td>
@@ -1114,6 +1116,7 @@ document.addEventListener('DOMContentLoaded', function(){
                      '<td>'+imgCell+'</td>' +
                      '<td>'+escapeHtml(p.name)+'</td>' +
                      '<td>'+escapeHtml(p.sku)+'</td>' +
+                     '<td>$'+Number(p.cost_initial).toFixed(2)+'</td>' + // NUEVA COLUMNA
                      '<td>$'+Number(p.price).toFixed(2)+'</td>' +
                      '<td>'+Number(p.min_quantity)+'</td>' +
                      '<td>'+escapeHtml(p.category_name || '-')+'</td>' +
