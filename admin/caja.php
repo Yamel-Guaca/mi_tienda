@@ -80,6 +80,8 @@ $stmt->execute([$currentUserId, $currentBranchId]);
 $currentSession = $stmt->fetch(PDO::FETCH_ASSOC);
 
 // Preparar consulta para ventas por sesión (entre apertura y cierre)
+// --- NUEVO: preparar consulta para pagos virtuales ---
+// Preparar consulta para ventas por sesión (entre apertura y cierre)
 $stmtVentasSesion = $pdo->prepare("
     SELECT SUM(total)
     FROM orders
@@ -87,6 +89,19 @@ $stmtVentasSesion = $pdo->prepare("
       AND status != 'cancelado'
       AND created_at BETWEEN ? AND ?
 ");
+
+// Preparar consulta para pagos virtuales
+$stmtVirtual = $pdo->prepare("
+    SELECT COALESCE(SUM(p.amount),0) 
+    FROM payments p
+    JOIN orders o ON o.id = p.order_id
+    WHERE p.method = 'virtual'
+      AND p.status = 'completado'
+      AND p.created_at BETWEEN ? AND ?
+      AND o.branch_id = ?
+");
+
+
 
 // Variable para mostrar reporte después de cerrar
 $reportSession = null;
@@ -133,6 +148,20 @@ if ($action === 'close' && $currentSession) {
     $closedAt = $reportSession['closed_at'] ?: date('Y-m-d H:i:s');
     $stmtVentasSesion->execute([$currentBranchId, $openedAt, $closedAt]);
     $reportVentas = $stmtVentasSesion->fetchColumn() ?: 0;
+
+    // --- NUEVO: sumar pagos virtuales dentro del mismo rango ---
+    $stmtVirtual = $pdo->prepare("
+        SELECT COALESCE(SUM(amount),0) 
+        FROM payments p
+        JOIN orders o ON o.id = p.order_id
+        WHERE p.method = 'virtual'
+          AND p.status = 'completado'
+        AND p.created_at BETWEEN ? AND ?
+        AND o.branch_id = ?
+    ");
+    $stmtVirtual->execute([$openedAt, $closedAt, $currentBranchId]);
+    $reportVirtualPayments = (float)$stmtVirtual->fetchColumn();
+
 
     // Preparar mensaje y NO redirigir: mostramos el reporte en la misma vista
     $msg = "Caja cerrada correctamente. Generando reporte de cierre.";
@@ -417,7 +446,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Si acabamos de cerrar y tenemos datos para el reporte, mostrarlo aquí
     if ($reportSession):
         $rep = $reportSession;
-        $repDiff = $rep['closing_amount'] - ($rep['opening_amount'] + $reportVentas);
+        $repDiff = $rep['closing_amount'] - ($rep['opening_amount'] + $reportVentas - $reportVirtualPayments);
     ?>
     <div class="report" id="report-cierre">
         <h4>Reporte de Cierre - Caja #<?= htmlspecialchars($rep['id']) ?></h4>
@@ -427,6 +456,8 @@ document.addEventListener("DOMContentLoaded", () => {
         <div class="row"><div class="bold">Apertura registrada:</div><div>$<?= number_format($rep['opening_amount'],0,",",".") ?> (<?= $rep['opened_at'] ?>)</div></div>
         <div class="row"><div class="bold">Cierre contado:</div><div>$<?= number_format($rep['closing_amount'],0,",",".") ?> (<?= $rep['closed_at'] ?>)</div></div>
         <div class="row"><div class="bold">Ventas en la sesión:</div><div>$<?= number_format($reportVentas,0,",",".") ?></div></div>
+        <div class="row"><div class="bold">Ventas virtuales en la sesión:</div><div>$<?= number_format($reportVirtualPayments,0,",",".") ?></div></div>
+
         <div class="row"><div class="bold">Diferencia (cierre - (apertura + ventas)):</div><div><?= ($repDiff >= 0 ? '+' : '-') . '$' . number_format(abs($repDiff),0,",",".") ?></div></div>
 
         <hr>
@@ -489,12 +520,18 @@ if ($currentUserRole == 1):
                 $openedAt = $s['opened_at'];
                 $closedAt = $s['closed_at'] ?: date('Y-m-d H:i:s');
                 $stmtVentasSesion->execute([$currentBranchId, $openedAt, $closedAt]);
-                $ventasSesion = $stmtVentasSesion->fetchColumn() ?: 0;
+$ventasSesion = $stmtVentasSesion->fetchColumn() ?: 0;
 
-                $diff = null;
-                if ($s['closing_amount'] !== null) {
-                    $diff = $s['closing_amount'] - ($s['opening_amount'] + $ventasSesion);
-                }
+// Sumar pagos virtuales para esa sesión
+$stmtVirtual->execute([$openedAt, $closedAt, $currentBranchId]);
+$virtualSesion = (float)$stmtVirtual->fetchColumn();
+
+$diff = null;
+if ($s['closing_amount'] !== null) {
+    $diff = $s['closing_amount'] - ($s['opening_amount'] + $ventasSesion - $virtualSesion);
+}
+$diffTexto = ($diff === null) ? '-' : (($diff >= 0 ? '+' : '-') . '$' . number_format(abs($diff), 0, ",", "."));
+
                 $diffTexto = ($diff === null) ? '-' : (($diff >= 0 ? '+' : '-') . '$' . number_format(abs($diff), 0, ",", "."));
             ?>
             <tr>
