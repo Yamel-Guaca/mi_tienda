@@ -167,7 +167,7 @@ try {
       <a href="/mi_tienda/admin/reportes_ganancias.php" class="btn">Reporte de Ganancias</a>       
       <a href="/mi_tienda/admin/invoices_list.php" class="btn">Borrar Factura</a>
       <a href="/mi_tienda/admin/branch_visibility.php" class="btn">Visibilidad de Categorías y Subcategorías por Sucursal</a>
-      <a href="/mi_tienda/admin/hora_test.php" class="btn">prueba</a>
+      <a href="/mi_tienda/admin/invoice_template.php">Plantilla Factura</a>
     </p>
 
   <div class="container">
