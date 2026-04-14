@@ -34,8 +34,7 @@ $products = $pdo->query("SELECT name FROM products WHERE active=1 ORDER BY name"
   </ul>
   <div class="actions">
     <button class="btn primary" onclick="window.print()">Imprimir</button>
-    <form method="post" action="export_excel.php" style="display:inline;">
-      <button class="btn secondary">Descargar Excel</button>
+    <form method="post" action="export_excel.php" style="display:inline;">      
     </form>
   </div>
 </div>

@@ -472,9 +472,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         <div style="margin-top:12px; display:flex; gap:8px;">
             <!-- Botones para abrir la vista de impresión adaptable (invoice_print.php) -->
-            <button onclick="window.open('<?= htmlspecialchars('invoice_print.php?session_id='.$rep['id']) ?>','_blank','noopener')">Vista impresión (seleccionar ancho)</button>
+            
             <button onclick="window.open('<?= htmlspecialchars('invoice_print.php?session_id='.$rep['id'].'&width=58') ?>','_blank','noopener')">Imprimir 58mm</button>
-            <button onclick="window.open('<?= htmlspecialchars('invoice_print.php?session_id='.$rep['id'].'&width=80') ?>','_blank','noopener')">Imprimir 80mm</button>
+            
 
             <form method="POST" style="margin:0;">
                 <input type="hidden" name="action" value="ack_report">

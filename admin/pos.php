@@ -238,6 +238,7 @@ if ($currentSubcategoryId > 0) {
       <a href="/mi_tienda/admin/invoices_list.php">Facturas</a>
       <a href="#">Traslado de Mercancía</a>
       <a href="/mi_tienda/admin/listado_productos.php">Listado Pedidos</a>
+      <a href="/mi_tienda/admin/dashboard.php">Administrador</a>
     </div>
   </div>
   <div class="header-right">
