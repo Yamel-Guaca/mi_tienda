@@ -136,6 +136,9 @@ if ($closureId > 0) {
     $closing_amount = floatval($c['closing_amount'] ?? 0);
     $difference = $closing_amount - ($opening_amount + $sales_total);
 
+    // --- NUEVO: valor a retirar (dejar la apertura en caja) ---
+    $withdraw_amount = $closing_amount - $opening_amount;
+
     // Ancho de impresión
     $width = (isset($_GET['width']) && intval($_GET['width']) === 80) ? '80mm' : '58mm';
 
@@ -154,7 +157,7 @@ if ($closureId > 0) {
         /* Base y ancho para impresora térmica */
         :root { --pad:8px; --small:11px; --mono: "Courier New", Courier, monospace; }
         html,body{margin:0;padding:0;background:#fff;color:#000;font-family:var(--mono);font-size:12px;}
-        .ticket{width:100%;max-width:320px;padding:var(--pad);box-sizing:border-box;}
+        .ticket{width:100%;max-width:320px;padding:var(--pad);box-sizing:border-box; font-weight:700;} /* TODO: todo el texto en negrilla */
         @media print { body{width:<?= $width ?>;} .no-print{display:none;} }
 
         /* Encabezado */
@@ -210,6 +213,8 @@ if ($closureId > 0) {
         </div>
 
         <div class="sep"></div>
+
+        <div class="row"><div class="label">Valor a retirar</div><div class="value"><?= $fmt($withdraw_amount) ?></div></div>
 
         <div class="row"><div class="label">Ventas en la sesión</div><div class="value"><?= $fmt($sales_total) ?></div></div>
         <div class="row"><div class="label">Ventas virtuales</div><div class="value"><?= $fmt($sales_virtual) ?></div></div>

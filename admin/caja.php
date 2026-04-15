@@ -80,7 +80,6 @@ $stmt->execute([$currentUserId, $currentBranchId]);
 $currentSession = $stmt->fetch(PDO::FETCH_ASSOC);
 
 // Preparar consulta para ventas por sesión (entre apertura y cierre)
-// --- NUEVO: preparar consulta para pagos virtuales ---
 // Preparar consulta para ventas por sesión (entre apertura y cierre)
 $stmtVentasSesion = $pdo->prepare("
     SELECT SUM(total)
@@ -100,8 +99,6 @@ $stmtVirtual = $pdo->prepare("
       AND p.created_at BETWEEN ? AND ?
       AND o.branch_id = ?
 ");
-
-
 
 // Variable para mostrar reporte después de cerrar
 $reportSession = null;
@@ -162,7 +159,6 @@ if ($action === 'close' && $currentSession) {
     $stmtVirtual->execute([$openedAt, $closedAt, $currentBranchId]);
     $reportVirtualPayments = (float)$stmtVirtual->fetchColumn();
 
-
     // Preparar mensaje y NO redirigir: mostramos el reporte en la misma vista
     $msg = "Caja cerrada correctamente. Generando reporte de cierre.";
     // Nota: no hacemos header redirect para que el cajero vea el reporte inmediatamente
@@ -202,8 +198,8 @@ $sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
     header { background:#0a6; color:#fff; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; }
     .branch { font-size:14px; opacity:0.9; }
     .container { max-width:1100px; margin:20px auto; background:#fff; padding:20px; border-radius:8px; }
-    table { width:100%; border-collapse:collapse; margin-top:20px; }
-    th, td { padding:10px; border-bottom:1px solid #ddd; text-align:center; }
+    table { width:100%; border-collapse:collapse; margin-top:20px; position:relative; }
+    th, td { padding:10px; border-bottom:1px solid #ddd; text-align:center; position:relative; }
     th { background:#eee; }
     .msg { background:#dff0d8; padding:10px; border-radius:6px; margin-bottom:10px; }
     input { padding:6px; width:100%; box-sizing:border-box; }
@@ -212,6 +208,29 @@ $sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
     .report h4 { margin:0 0 10px 0; }
     .report .row { display:flex; justify-content:space-between; margin-bottom:6px; }
     .report .bold { font-weight:bold; }
+
+    /* Alternar "sombra" de color (azul/rojo) debajo de cada fila */
+    table tbody tr { position:relative; }
+    table tbody tr::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: -1px;
+        height: 6px;
+        pointer-events: none;
+        border-radius: 0 0 4px 4px;
+    }
+    table tbody tr:nth-child(odd)::after {
+        background: rgba(0, 123, 255, 0.06); /* azul suave */
+    }
+    table tbody tr:nth-child(even)::after {
+        background: rgba(220, 53, 69, 0.06); /* rojo suave */
+    }
+
+    /* Ocultar columna ID en la vista (no mostrar al usuario) */
+    .id-col { display:none; }
+
     @media (max-width:768px) {
         header { flex-direction:column; align-items:flex-start; }
         .table { display:block; overflow-x:auto; white-space:nowrap; }
@@ -257,6 +276,7 @@ $sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <h3>Arqueo de Caja</h3>
 <p>Sucursal actual: <?= htmlspecialchars($currentBranchName) ?></p>
 
+<!-- Denominaciones y inputs (restaurado) -->
 <table class="table">
     <thead>
         <tr>
@@ -287,6 +307,7 @@ $sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <div style="margin-top:15px;">
     <strong>Total en caja: $<span id="total-caja">0</span></strong>
 </div>
+
 <script>
 // Formatear con puntos de mil
 function formatMiles(num) {
@@ -392,7 +413,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 </script>
 
-<div class="container">
+<div style="margin-top:18px;"></div>
 
 <?php if ($msg): ?>
     <div class="msg"><?= htmlspecialchars($msg) ?></div>
@@ -447,6 +468,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if ($reportSession):
         $rep = $reportSession;
         $repDiff = $rep['closing_amount'] - ($rep['opening_amount'] + $reportVentas - $reportVirtualPayments);
+
+        // --- NUEVO: calcular valor a retirar (dejar la apertura en caja) ---
+        $valor_retirar = floatval($rep['closing_amount']) - floatval($rep['opening_amount']);
     ?>
     <div class="report" id="report-cierre">
         <h4>Reporte de Cierre - Caja #<?= htmlspecialchars($rep['id']) ?></h4>
@@ -455,12 +479,16 @@ document.addEventListener("DOMContentLoaded", () => {
         <div class="row"><div class="bold">Sucursal:</div><div><?= htmlspecialchars($currentBranchName) ?></div></div>
         <div class="row"><div class="bold">Apertura registrada:</div><div>$<?= number_format($rep['opening_amount'],0,",",".") ?> (<?= $rep['opened_at'] ?>)</div></div>
         <div class="row"><div class="bold">Cierre contado:</div><div>$<?= number_format($rep['closing_amount'],0,",",".") ?> (<?= $rep['closed_at'] ?>)</div></div>
+
+        <!-- Mostrar Valor a retirar -->
+        <div class="row"><div class="bold">Valor a retirar:</div>
+            <div><?= ($valor_retirar >= 0 ? '' : '-') . '$' . number_format(abs($valor_retirar),0,",",".") ?></div>
+        </div>
+
         <div class="row"><div class="bold">Ventas en la sesión:</div><div>$<?= number_format($reportVentas,0,",",".") ?></div></div>
         <div class="row"><div class="bold">Ventas virtuales en la sesión:</div><div>$<?= number_format($reportVirtualPayments,0,",",".") ?></div></div>
 
         <div class="row"><div class="bold">Diferencia (cierre - (apertura + ventas)):</div><div><?= ($repDiff >= 0 ? '+' : '-') . '$' . number_format(abs($repDiff),0,",",".") ?></div></div>
-
-        <hr>
 
         <div style="margin-top:8px;">
             <strong>Notas:</strong>
@@ -472,14 +500,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
         <div style="margin-top:12px; display:flex; gap:8px;">
             <!-- Botones para abrir la vista de impresión adaptable (invoice_print.php) -->
-            
-            <button onclick="window.open('<?= htmlspecialchars('invoice_print.php?session_id='.$rep['id'].'&width=58') ?>','_blank','noopener')">Imprimir 58mm</button>
-            
+            <button onclick="window.open('<?= htmlspecialchars('invoice_print.php?session_id='.$rep['id'].'&width=58') ?>','_blank','noopener')">Imprimir</button>
 
             <form method="POST" style="margin:0;">
                 <input type="hidden" name="action" value="ack_report">
                 <input type="hidden" name="session_id" value="<?= htmlspecialchars($rep['id']) ?>">
-                <button type="submit">Aceptar (No imprimir)</button>
+                
             </form>
         </div>
     </div>
@@ -504,7 +530,7 @@ if ($currentUserRole == 1):
     <table class="table">
         <thead>
             <tr>
-                <th>ID</th>
+                <th class="id-col">ID</th>
                 <th>Usuario</th>
                 <th>Apertura</th>
                 <th>Cierre</th>
@@ -512,6 +538,7 @@ if ($currentUserRole == 1):
                 <th>Abierta</th>
                 <th>Cerrada</th>
                 <th>Diferencia</th>
+                <th>Valor a Retirar</th>
             </tr>
         </thead>
         <tbody>
@@ -520,22 +547,27 @@ if ($currentUserRole == 1):
                 $openedAt = $s['opened_at'];
                 $closedAt = $s['closed_at'] ?: date('Y-m-d H:i:s');
                 $stmtVentasSesion->execute([$currentBranchId, $openedAt, $closedAt]);
-$ventasSesion = $stmtVentasSesion->fetchColumn() ?: 0;
+                $ventasSesion = $stmtVentasSesion->fetchColumn() ?: 0;
 
-// Sumar pagos virtuales para esa sesión
-$stmtVirtual->execute([$openedAt, $closedAt, $currentBranchId]);
-$virtualSesion = (float)$stmtVirtual->fetchColumn();
+                // Sumar pagos virtuales para esa sesión
+                $stmtVirtual->execute([$openedAt, $closedAt, $currentBranchId]);
+                $virtualSesion = (float)$stmtVirtual->fetchColumn();
 
-$diff = null;
-if ($s['closing_amount'] !== null) {
-    $diff = $s['closing_amount'] - ($s['opening_amount'] + $ventasSesion - $virtualSesion);
-}
-$diffTexto = ($diff === null) ? '-' : (($diff >= 0 ? '+' : '-') . '$' . number_format(abs($diff), 0, ",", "."));
-
+                $diff = null;
+                if ($s['closing_amount'] !== null) {
+                    $diff = $s['closing_amount'] - ($s['opening_amount'] + $ventasSesion - $virtualSesion);
+                }
                 $diffTexto = ($diff === null) ? '-' : (($diff >= 0 ? '+' : '-') . '$' . number_format(abs($diff), 0, ",", "."));
+
+                // Valor a retirar por sesión
+                $withdrawSesion = null;
+                if ($s['closing_amount'] !== null) {
+                    $withdrawSesion = floatval($s['closing_amount']) - floatval($s['opening_amount']);
+                }
+                $withdrawTexto = ($withdrawSesion === null) ? '-' : ('$' . number_format($withdrawSesion, 0, ",", "."));
             ?>
             <tr>
-                <td><?= $s['id'] ?></td>
+                <td class="id-col"><?= $s['id'] ?></td>
                 <td><?= htmlspecialchars($s['user_name']) ?></td>
                 <td>$<?= number_format($s['opening_amount'], 0, ",", ".") ?></td>
                 <td><?= $s['closing_amount'] !== null ? '$'.number_format($s['closing_amount'], 0, ",", ".") : '-' ?></td>
@@ -543,6 +575,7 @@ $diffTexto = ($diff === null) ? '-' : (($diff >= 0 ? '+' : '-') . '$' . number_f
                 <td><?= $s['opened_at'] ?></td>
                 <td><?= $s['closed_at'] ?: '-' ?></td>
                 <td><?= $diffTexto ?></td>
+                <td><?= $withdrawTexto ?></td>
             </tr>
             <?php endforeach; ?>
         </tbody>
