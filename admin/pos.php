@@ -22,14 +22,6 @@ if (!$currentBranchName) {
     $currentBranchName = "No seleccionada";
 }
 
-// --- Valores por defecto para redirección táctil (disponibles en todo el archivo) ---
-$defaultCat = 12;
-$defaultSub = 271;
-
-// Variable de mensaje y control
-$msg = "";
-$diferencia = null;
-
 // ✅ Procesar venta
 $action = $_GET['action'] ?? null;
 if ($action === "sell" && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -99,12 +91,10 @@ if ($action === "sell" && $_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         // ✅ Abrir factura e imprimir
-        // Redirigir al modo táctil con parámetros por defecto y limpiar carrito
-        $redirectUrl = "pos.php?mode=tactil&cat={$defaultCat}&sub={$defaultSub}&cleancart=1";
         echo "<script>
             try { localStorage.removeItem('pos_cart'); } catch(e) {}
             window.open('/mi_tienda/admin/invoice_print.php?order_id={$order_id}','_blank');
-            window.location.href='{$redirectUrl}';
+            window.location.href='pos.php?mode=tactil&cleancart=1';
         </script>";
         exit;
     }
@@ -113,16 +103,6 @@ if ($action === "sell" && $_SERVER['REQUEST_METHOD'] === 'POST') {
 // ✅ Datos del modo táctil
 $currentCategoryId = intval($_GET['cat'] ?? 0);
 $currentSubcategoryId = intval($_GET['sub'] ?? 0);
-
-// --- Redirección por defecto cuando no se especifican parámetros (no interferir con POST) ---
-$mode = $_GET['mode'] ?? null;
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    if (empty($mode) || ($mode === 'tactil' && $currentCategoryId === 0 && $currentSubcategoryId === 0)) {
-        $qs = http_build_query(['mode' => 'tactil', 'cat' => $defaultCat, 'sub' => $defaultSub]);
-        header("Location: pos.php?$qs");
-        exit;
-    }
-}
 
 // ✅ Cargar categorías visibles
 $stmt = $pdo->prepare("
@@ -158,8 +138,7 @@ if ($currentSubcategoryId > 0) {
     ");
     $stmt->execute([$currentBranchId, $currentSubcategoryId]);
     if (!$stmt->fetchColumn()) {
-        // Redirigir a la URL táctil con parámetros por defecto
-        header("Location: pos.php?mode=tactil&cat={$defaultCat}&sub={$defaultSub}");
+        header("Location: pos.php?mode=tactil");
         exit;
     }
 }
@@ -263,7 +242,7 @@ if ($currentSubcategoryId > 0) {
     </div>
   </div>
   <div class="header-right">
-    <a href="pos.php?mode=tactil&cat=<?= $defaultCat ?>&sub=<?= $defaultSub ?>" class="btn">Modo táctil</a>
+    <a href="pos.php?mode=tactil" class="btn">Modo táctil</a>
     <a href="/mi_tienda/admin/logout.php" class="btn btn-danger">Cerrar sesión</a>
   </div>
 </header>
@@ -290,7 +269,7 @@ if ($currentSubcategoryId > 0) {
     <div class="pos-search-wrapper" aria-hidden="false" style="margin:8px 0 12px;">
       <label for="global-search" class="sr-only">Buscar productos en la categoría actual</label>
       <div class="pos-search">
-        <input id="global-search" type="search" inputmode="search" placeholder="Buscar producto (nombre o SKU)" autocomplete="off" autofocus />
+        <input id="global-search" type="search" inputmode="search" placeholder="Buscar producto (nombre o SKU)" autocomplete="off" />
         <button id="global-search-clear" type="button" aria-label="Limpiar búsqueda">✕</button>
       </div>
     </div>
@@ -372,7 +351,7 @@ if ($currentSubcategoryId > 0) {
             <?php endforeach; ?>
         </div>
     <?php endif; ?>
-    <!-- PANEL DERECHO -->
+     <!-- PANEL DERECHO -->
     <div class="pos-right">
         <h3>Carrito</h3>
         <div class="cart-panel">
@@ -512,8 +491,7 @@ if ($currentSubcategoryId > 0) {
             panel.style.display = 'block';
             panel.setAttribute('aria-hidden','false');
             input.focus();
-
-            if (panelMode === 'post') {
+             if (panelMode === 'post') {
               confirmPostBtn.style.display = 'inline-block';
               confirmAjaxBtn.style.display = 'none';
             } else {
@@ -620,8 +598,7 @@ if ($currentSubcategoryId > 0) {
                 } else {
                   window.open(data.receipt_url, '_blank');
                 }
-                // Redirigir al modo táctil con parámetros por defecto y limpiar carrito
-                window.location.href = 'pos.php?mode=tactil&cat=<?= $defaultCat ?>&sub=<?= $defaultSub ?>&cleancart=1';
+                window.location.href = 'pos.php?mode=tactil&cleancart=1';
               } else {
                 errorEl.textContent = (data && data.message) ? data.message : 'Error al procesar la venta';
                 confirmAjaxBtn.disabled = false;
@@ -672,6 +649,36 @@ if ($currentSubcategoryId > 0) {
               initWithCart(numeric, 0, 'post');
             });
           }
+          const confirmSaleBtn = document.getElementById('confirm-sale-btn');
+          const sellFormEl = document.getElementById('sell-form');
+          if (sellFormEl) {
+            sellFormEl.addEventListener('submit', function(e){
+              if (window.__pos_submit_in_progress) return;
+              e.preventDefault();
+
+              let raw = '[]';
+              try { raw = localStorage.getItem('pos_cart') || '[]'; } catch(e) { raw = '[]'; }
+              let parsed;
+              try { parsed = JSON.parse(raw); } catch(e) { parsed = []; }
+
+              if (!Array.isArray(parsed) || parsed.length === 0) {
+                alert('El carrito está vacío. Agrega productos antes de confirmar la venta.');
+                return;
+              }
+
+              const t = document.getElementById('total').textContent || '0';
+              const numeric = String(t).replace(/[^0-9\.,-]/g,'').replace(/,/g,'');
+              if (window.CashPanel && typeof window.CashPanel.initWithCart === 'function') {
+                window.CashPanel.initWithCart(numeric, 0, 'post');
+              } else {
+                itemsInput.value = JSON.stringify(parsed);
+                window.__pos_submit_in_progress = true;
+                sellFormEl.submit();
+              }
+            });
+          }
+
+          window.CashPanel = { initWithCart };
         })();
         </script>
     </div> <!-- cierre pos-right -->
@@ -695,7 +702,7 @@ if ($currentSubcategoryId > 0) {
 </audio>
 
 <script>
-function goToCategories() { window.location.href = "pos.php?mode=tactil&cat=<?= $defaultCat ?>&sub=<?= $defaultSub ?>"; }
+function goToCategories() { window.location.href = "pos.php?mode=tactil"; }
 function goToCategory(catId) { window.location.href = "pos.php?mode=tactil&cat=" + catId; }
 function goToSubcategory(catId, subId) { window.location.href = "pos.php?mode=tactil&cat=" + catId + "&sub=" + subId; }
 /* ============================================
@@ -831,7 +838,6 @@ document.addEventListener("keydown", function(e) {
         if (e.key === "F3") { e.preventDefault(); clearCart(); }
     }
 });
-
 function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; });
 }
@@ -947,77 +953,6 @@ function escapeHtml(s) {
       }
     } catch(e){}
   } catch(e){}
-})();
-
-/* ============================
-   SCRIPT ADICIONAL: Mantener foco en el buscador
-   ============================ */
-(function(){
-  function focusSearch(){
-    try {
-      const el = document.getElementById('global-search');
-      if (!el) return;
-      el.focus({preventScroll:true});
-      if (typeof el.select === 'function') el.select();
-    } catch(e){}
-  }
-
-  document.addEventListener('DOMContentLoaded', function(){
-    setTimeout(focusSearch, 60);
-  });
-
-  try {
-    const cartBody = document.getElementById('cart-body');
-    if (cartBody) {
-      const mo = new MutationObserver(function(){
-        setTimeout(focusSearch, 60);
-      });
-      mo.observe(cartBody, { childList: true, subtree: true });
-    }
-  } catch(e){}
-
-  try {
-    const modal = document.getElementById('modal-overlay');
-    if (modal) {
-      const mo2 = new MutationObserver(function(){
-        const visible = (modal.style.display && modal.style.display !== 'none');
-        if (!visible) setTimeout(focusSearch, 60);
-      });
-      mo2.observe(modal, { attributes: true, attributeFilter: ['style'] });
-    }
-  } catch(e){}
-
-  try {
-    const cashPanel = document.getElementById('cash-panel');
-    if (cashPanel) {
-      const mo3 = new MutationObserver(function(){
-        const hidden = cashPanel.getAttribute('aria-hidden') === 'true' || cashPanel.style.display === 'none';
-        if (hidden) setTimeout(focusSearch, 60);
-      });
-      mo3.observe(cashPanel, { attributes: true, attributeFilter: ['style','aria-hidden'] });
-    }
-  } catch(e){}
-
-  document.addEventListener('click', function(e){
-    try {
-      const t = e.target;
-      if (t.closest && (t.closest('.product-card') || t.closest('.card-tactil') || t.id === 'open-cash-panel-2' || t.id === 'cp-cancel' || t.id === 'confirm-sale-btn' || t.id === 'confirm-sale')) {
-        setTimeout(focusSearch, 120);
-      }
-      if (t.classList && t.classList.contains('btn-danger') && /Limpiar|Vaciar/i.test(t.textContent || '')) {
-        setTimeout(focusSearch, 120);
-      }
-    } catch(e){}
-  }, true);
-
-  try {
-    window.addEventListener('storage', function(e){
-      if (e.key === 'pos_cart') setTimeout(focusSearch, 60);
-    });
-  } catch(e){}
-
-  window.addEventListener('focus', function(){ setTimeout(focusSearch, 60); });
-
 })();
 </script>
 </body>
