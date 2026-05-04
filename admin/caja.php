@@ -103,6 +103,7 @@ $stmtVirtual = $pdo->prepare("
 // Variable para mostrar reporte después de cerrar
 $reportSession = null;
 $reportVentas  = 0;
+$reportVirtualPayments = 0;
 
 // Apertura
 if ($action === 'open' && !$currentSession) {
@@ -125,6 +126,10 @@ if ($action === 'open' && !$currentSession) {
 if ($action === 'close' && $currentSession) {
     // Tomar el monto de cierre enviado por el formulario
     $closing = floatval(str_replace('.', '', $_POST['closing_amount'] ?? 0));
+
+    // Tomar el monto de ventas virtuales reportadas por el cajero (si lo envía)
+    $reportedVirtual = floatval(str_replace('.', '', $_POST['reported_virtual_payments'] ?? 0));
+
     $diferencia = $closing - $currentSession['opening_amount'];
 
     // Actualizar la sesión en la base de datos
@@ -146,7 +151,21 @@ if ($action === 'close' && $currentSession) {
     $stmtVentasSesion->execute([$currentBranchId, $openedAt, $closedAt]);
     $reportVentas = $stmtVentasSesion->fetchColumn() ?: 0;
 
-    // --- NUEVO: sumar pagos virtuales dentro del mismo rango ---
+    // --- Usar el valor reportado por el cajero si existe; si no, caer a la suma desde payments ---
+    if ($reportedVirtual > 0) {
+        $reportVirtualPayments = $reportedVirtual;
+    } else {
+        // si no se reportó manualmente, sumar desde la BD (comportamiento previo)
+        $stmtVirtual->execute([$openedAt, $closedAt, $currentBranchId]);
+        $reportVirtualPayments = (float)$stmtVirtual->fetchColumn();
+    }
+
+    // Preparar mensaje y NO redirigir: mostramos el reporte en la misma vista
+    $msg = "Caja cerrada correctamente. Generando reporte de cierre.";
+    // Nota: no hacemos header redirect para que el cajero vea el reporte inmediatamente
+}
+
+// --- NUEVO: sumar pagos virtuales dentro del mismo rango ---
     $stmtVirtual = $pdo->prepare("
         SELECT COALESCE(SUM(amount),0) 
         FROM payments p
@@ -156,13 +175,16 @@ if ($action === 'close' && $currentSession) {
         AND p.created_at BETWEEN ? AND ?
         AND o.branch_id = ?
     ");
-    $stmtVirtual->execute([$openedAt, $closedAt, $currentBranchId]);
-    $reportVirtualPayments = (float)$stmtVirtual->fetchColumn();
+    $stmtVirtual->execute([$openedAt ?? date('Y-m-d H:i:s'), $closedAt ?? date('Y-m-d H:i:s'), $currentBranchId]);
+    // Solo asignar si no fue ya asignado por el cierre (evitar sobrescribir)
+    if (empty($reportVirtualPayments)) {
+        $reportVirtualPayments = (float)$stmtVirtual->fetchColumn();
+    } else {
+        // si ya tenemos $reportVirtualPayments (reportado manualmente), no sobrescribir
+    }
 
     // Preparar mensaje y NO redirigir: mostramos el reporte en la misma vista
-    $msg = "Caja cerrada correctamente. Generando reporte de cierre.";
     // Nota: no hacemos header redirect para que el cajero vea el reporte inmediatamente
-}
 
 // Ventas del día de esa sucursal
 $stmt = $pdo->prepare("
@@ -395,8 +417,8 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    // Escuchar cambios en apertura/cierre para recalcular diferencia
-    ["opening_amount","closing_amount"].forEach(id => {
+    // Escuchar cambios en apertura/cierre/ventas virtuales para recalcular diferencia
+    ["opening_amount","closing_amount","reported_virtual_payments"].forEach(id => {
         const el = document.getElementById(id);
         if (el) {
             el.addEventListener("input", (e) => {
@@ -437,6 +459,11 @@ document.addEventListener("DOMContentLoaded", () => {
         <input type="hidden" name="action" value="close">
         <label>Monto de cierre:</label>
         <input type="text" name="closing_amount" id="closing_amount" required>
+
+        <!-- NUEVO: Ventas Virtuales en la Sesión Reportadas (debajo de Cierre contado) -->
+        <label style="margin-top:8px; display:block;">Ventas Virtuales en la Sesión Reportadas:</label>
+        <input type="text" name="reported_virtual_payments" id="reported_virtual_payments" value="0" required>
+
         <button type="submit">Cerrar caja</button>
     </form>
 
@@ -463,7 +490,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <small style="display:block; margin-top:8px; color:#666;">Para descuadre considerando ventas de la sesión, ver columna “Diferencia” en el historial.</small>
     </div>
 
-    <?php
+<?php
     // Si acabamos de cerrar y tenemos datos para el reporte, mostrarlo aquí
     if ($reportSession):
         $rep = $reportSession;
