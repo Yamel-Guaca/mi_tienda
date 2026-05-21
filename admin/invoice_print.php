@@ -134,8 +134,9 @@ if ($closureId > 0) {
     // Diferencia: cierre - (apertura + ventas)
     $opening_amount = floatval($c['opening_amount'] ?? 0);
     $closing_amount = floatval($c['closing_amount'] ?? 0);
-    // CORRECCIÓN: incluir ventas virtuales en la suma para calcular la diferencia correctamente
-    $difference = $closing_amount - ($opening_amount + $sales_total + $sales_virtual);
+    // CORRECCIÓN: usar la misma lógica que en caja.php: no restar ventas virtuales
+    // porque orders.total ya incluye las ventas (evita doble conteo).
+    $difference = $closing_amount - ($opening_amount + $sales_total);
 
     // --- NUEVO: valor a retirar (dejar la apertura en caja) ---
     $withdraw_amount = $closing_amount - $opening_amount;
@@ -223,7 +224,7 @@ if ($closureId > 0) {
         <div class="sep"></div>
 
         <div class="row">
-          <div class="label">Diferencia (cierre - (apertura + ventas + ventas virtuales))</div>
+          <div class="label">Diferencia (cierre - (apertura + ventas))</div>
           <div class="value"><?= ($difference >= 0 ? '+' : '-') . $fmt(abs($difference)) ?></div>
         </div>
 

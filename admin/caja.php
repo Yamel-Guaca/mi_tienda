@@ -80,7 +80,6 @@ $stmt->execute([$currentUserId, $currentBranchId]);
 $currentSession = $stmt->fetch(PDO::FETCH_ASSOC);
 
 // Preparar consulta para ventas por sesión (entre apertura y cierre)
-// Preparar consulta para ventas por sesión (entre apertura y cierre)
 $stmtVentasSesion = $pdo->prepare("
     SELECT SUM(total)
     FROM orders
@@ -127,9 +126,6 @@ if ($action === 'close' && $currentSession) {
     // Tomar el monto de cierre enviado por el formulario
     $closing = floatval(str_replace('.', '', $_POST['closing_amount'] ?? 0));
 
-    // Tomar el monto de ventas virtuales reportadas por el cajero (si lo envía)
-    $reportedVirtual = floatval(str_replace('.', '', $_POST['reported_virtual_payments'] ?? 0));
-
     $diferencia = $closing - $currentSession['opening_amount'];
 
     // Actualizar la sesión en la base de datos
@@ -151,14 +147,9 @@ if ($action === 'close' && $currentSession) {
     $stmtVentasSesion->execute([$currentBranchId, $openedAt, $closedAt]);
     $reportVentas = $stmtVentasSesion->fetchColumn() ?: 0;
 
-    // --- Usar el valor reportado por el cajero si existe; si no, caer a la suma desde payments ---
-    if ($reportedVirtual > 0) {
-        $reportVirtualPayments = $reportedVirtual;
-    } else {
-        // si no se reportó manualmente, sumar desde la BD (comportamiento previo)
-        $stmtVirtual->execute([$openedAt, $closedAt, $currentBranchId]);
-        $reportVirtualPayments = (float)$stmtVirtual->fetchColumn();
-    }
+    // Calcular ventas virtuales directamente desde la BD
+    $stmtVirtual->execute([$openedAt, $closedAt, $currentBranchId]);
+    $reportVirtualPayments = (float)$stmtVirtual->fetchColumn();
 
     // Preparar mensaje y NO redirigir: mostramos el reporte en la misma vista
     $msg = "Caja cerrada correctamente. Generando reporte de cierre.";
@@ -166,25 +157,25 @@ if ($action === 'close' && $currentSession) {
 }
 
 // --- NUEVO: sumar pagos virtuales dentro del mismo rango ---
-    $stmtVirtual = $pdo->prepare("
-        SELECT COALESCE(SUM(amount),0) 
-        FROM payments p
-        JOIN orders o ON o.id = p.order_id
-        WHERE p.method = 'virtual'
-          AND p.status = 'completado'
-        AND p.created_at BETWEEN ? AND ?
-        AND o.branch_id = ?
-    ");
-    $stmtVirtual->execute([$openedAt ?? date('Y-m-d H:i:s'), $closedAt ?? date('Y-m-d H:i:s'), $currentBranchId]);
-    // Solo asignar si no fue ya asignado por el cierre (evitar sobrescribir)
-    if (empty($reportVirtualPayments)) {
-        $reportVirtualPayments = (float)$stmtVirtual->fetchColumn();
-    } else {
-        // si ya tenemos $reportVirtualPayments (reportado manualmente), no sobrescribir
-    }
+$stmtVirtual = $pdo->prepare("
+    SELECT COALESCE(SUM(amount),0) 
+    FROM payments p
+    JOIN orders o ON o.id = p.order_id
+    WHERE p.method = 'virtual'
+      AND p.status = 'completado'
+    AND p.created_at BETWEEN ? AND ?
+    AND o.branch_id = ?
+");
+$stmtVirtual->execute([$openedAt ?? date('Y-m-d H:i:s'), $closedAt ?? date('Y-m-d H:i:s'), $currentBranchId]);
+// Solo asignar si no fue ya asignado por el cierre (evitar sobrescribir)
+if (empty($reportVirtualPayments)) {
+    $reportVirtualPayments = (float)$stmtVirtual->fetchColumn();
+} else {
+    // si ya tenemos $reportVirtualPayments (calculado en cierre), no sobrescribir
+}
 
-    // Preparar mensaje y NO redirigir: mostramos el reporte en la misma vista
-    // Nota: no hacemos header redirect para que el cajero vea el reporte inmediatamente
+// Preparar mensaje y NO redirigir: mostramos el reporte en la misma vista
+// Nota: no hacemos header redirect para que el cajero vea el reporte inmediatamente
 
 // Ventas del día de esa sucursal
 $stmt = $pdo->prepare("
@@ -417,8 +408,8 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    // Escuchar cambios en apertura/cierre/ventas virtuales para recalcular diferencia
-    ["opening_amount","closing_amount","reported_virtual_payments"].forEach(id => {
+    // Escuchar cambios en apertura/cierre para recalcular diferencia
+    ["opening_amount","closing_amount"].forEach(id => {
         const el = document.getElementById(id);
         if (el) {
             el.addEventListener("input", (e) => {
@@ -459,11 +450,6 @@ document.addEventListener("DOMContentLoaded", () => {
         <input type="hidden" name="action" value="close">
         <label>Monto de cierre:</label>
         <input type="text" name="closing_amount" id="closing_amount" required>
-
-        <!-- NUEVO: Ventas Virtuales en la Sesión Reportadas (debajo de Cierre contado) -->
-        <label style="margin-top:8px; display:block;">Ventas Virtuales en la Sesión Reportadas:</label>
-        <input type="text" name="reported_virtual_payments" id="reported_virtual_payments" value="0" required>
-
         <button type="submit">Cerrar caja</button>
     </form>
 
@@ -495,7 +481,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if ($reportSession):
         $rep = $reportSession;
         // CORRECCIÓN: sumar ventas virtuales en lugar de restarlas
-        $repDiff = $rep['closing_amount'] - ($rep['opening_amount'] + $reportVentas + $reportVirtualPayments);
+        $repDiff = $rep['closing_amount'] - ($rep['opening_amount'] + $reportVentas);
+
 
         // --- NUEVO: calcular valor a retirar (dejar la apertura en caja) ---
         $valor_retirar = floatval($rep['closing_amount']) - floatval($rep['opening_amount']);

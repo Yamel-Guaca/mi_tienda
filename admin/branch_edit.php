@@ -3,7 +3,7 @@
 require_once __DIR__ . '/../includes/auth_functions.php';
 require_once __DIR__ . '/../includes/db.php';
 
-require_role([1]); // Solo administradores
+require_role([1]); // Solo administradores ,Crear nueva sucursal
 
 $pdo = DB::getConnection();
 
