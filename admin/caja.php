@@ -480,8 +480,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // Si acabamos de cerrar y tenemos datos para el reporte, mostrarlo aquí
     if ($reportSession):
         $rep = $reportSession;
-        // CORRECCIÓN: sumar ventas virtuales en lugar de restarlas
-        $repDiff = $rep['closing_amount'] - ($rep['opening_amount'] + $reportVentas);
+        // Diferencia considerando ventas (NO incluir pagos virtuales si ya están en orders.total)
+        $repDiff = floatval($rep['closing_amount']) - (floatval($rep['opening_amount']) + floatval($reportVentas));
 
 
         // --- NUEVO: calcular valor a retirar (dejar la apertura en caja) ---
@@ -503,7 +503,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <div class="row"><div class="bold">Ventas en la sesión:</div><div>$<?= number_format($reportVentas,0,",",".") ?></div></div>
         <div class="row"><div class="bold">Ventas virtuales en la sesión:</div><div>$<?= number_format($reportVirtualPayments,0,",",".") ?></div></div>
 
-        <div class="row"><div class="bold">Diferencia (cierre - (apertura + ventas + ventas virtuales)):</div><div><?= ($repDiff >= 0 ? '+' : '-') . '$' . number_format(abs($repDiff),0,",",".") ?></div></div>
+        <div class="row"><div class="bold">Diferencia (cierre - (apertura + ventas)):</div><div><?= ($repDiff >= 0 ? '+' : '-') . '$' . number_format(abs($repDiff),0,",",".") ?></div></div>
 
         <div style="margin-top:8px;">
             <strong>Notas:</strong>
@@ -564,14 +564,14 @@ if ($currentUserRole == 1):
                 $stmtVentasSesion->execute([$currentBranchId, $openedAt, $closedAt]);
                 $ventasSesion = $stmtVentasSesion->fetchColumn() ?: 0;
 
-                // Sumar pagos virtuales para esa sesión
+                // Sumar pagos virtuales para esa sesión (solo para mostrar, no para restar)
                 $stmtVirtual->execute([$openedAt, $closedAt, $currentBranchId]);
                 $virtualSesion = (float)$stmtVirtual->fetchColumn();
 
                 $diff = null;
                 if ($s['closing_amount'] !== null) {
-                    // CORRECCIÓN: sumar ventas virtuales en lugar de restarlas
-                    $diff = $s['closing_amount'] - ($s['opening_amount'] + $ventasSesion + $virtualSesion);
+                    // NO incluir virtualSesion en la resta si ya está incluida en ventasSesion
+                    $diff = $s['closing_amount'] - ($s['opening_amount'] + $ventasSesion);
                 }
                 $diffTexto = ($diff === null) ? '-' : (($diff >= 0 ? '+' : '-') . '$' . number_format(abs($diff), 0, ",", "."));
 

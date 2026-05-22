@@ -94,7 +94,7 @@ if ($action === "sell" && $_SERVER['REQUEST_METHOD'] === 'POST') {
         echo "<script>
             try { localStorage.removeItem('pos_cart'); } catch(e) {}
             window.open('/mi_tienda/admin/invoice_print.php?order_id={$order_id}','_blank');
-            window.location.href='pos.php?mode=tactil&cat=8&sub=270&cleancart=1';
+            window.location.href='pos.php?mode=tactil&cat=8&sub=271&cleancart=1';
         </script>";
         exit;
     }
@@ -598,7 +598,7 @@ if ($currentSubcategoryId > 0) {
                 } else {
                   window.open(data.receipt_url, '_blank');
                 }
-                window.location.href = 'pos.php?mode=tactil&cat=8&sub=270&cleancart=1';
+                window.location.href = 'pos.php?mode=tactil&cat=8&sub=271&cleancart=1';
 
               } else {
                 errorEl.textContent = (data && data.message) ? data.message : 'Error al procesar la venta';
