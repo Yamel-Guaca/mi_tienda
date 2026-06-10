@@ -123,20 +123,23 @@ if ($closureId > 0) {
     $sales_total = floatval($stmt->fetchColumn());
 
     // Ventas virtuales (pagos virtuales) en el mismo rango
+    // Ajuste: sumar pagos vinculados a órdenes cuya orden fue creada en el rango
+    // Esto evita perder pagos cuyo payments.created_at difiera del created_at de la orden
     $stmt = $pdo->prepare("
       SELECT COALESCE(SUM(p.amount),0) FROM payments p
       INNER JOIN orders o ON o.id = p.order_id
-      WHERE o.branch_id = ? AND p.method = 'virtual' AND p.status = 'completado' AND p.created_at BETWEEN ? AND ?
+      WHERE o.branch_id = ? AND p.method = 'virtual' AND p.status = 'completado' AND o.created_at BETWEEN ? AND ?
     ");
     $stmt->execute([$c['branch_id'], $opening_at, $closing_at]);
     $sales_virtual = floatval($stmt->fetchColumn());
 
-    // Diferencia: cierre - (apertura + ventas)
+    // Diferencia: cierre - (apertura + ventas)  + ventas_virtual (si corresponde)
     $opening_amount = floatval($c['opening_amount'] ?? 0);
     $closing_amount = floatval($c['closing_amount'] ?? 0);
-    // CORRECCIÓN: usar la misma lógica que en caja.php: no restar ventas virtuales
-    // porque orders.total ya incluye las ventas (evita doble conteo).
-    $difference = $closing_amount - ($opening_amount + $sales_total);
+
+    // CORRECCIÓN: incluir ventas virtuales que no estén ya incluidas en orders.total
+    // Si en tu modelo orders.total ya incluye pagos virtuales, quita la suma de $sales_virtual.
+    $difference = $closing_amount - ($opening_amount + $sales_total) + $sales_virtual;
 
     // --- NUEVO: valor a retirar (dejar la apertura en caja) ---
     $withdraw_amount = $closing_amount - $opening_amount;
@@ -156,36 +159,37 @@ if ($closureId > 0) {
       <title>Reporte de Cierre - Caja #<?= htmlspecialchars($c['id']) ?></title>
       <meta name="viewport" content="width=device-width,initial-scale=1">
       <style>
-        /* Base y ancho para impresora térmica */
+        /* Base y ancho para impresora térmica - TODO EN NEGRILLA Y FECHAS EN NEGRO OSCURO */
         :root { --pad:8px; --small:11px; --mono: "Courier New", Courier, monospace; }
-        html,body{margin:0;padding:0;background:#fff;color:#000;font-family:var(--mono);font-size:12px;}
-        .ticket{width:100%;max-width:320px;padding:var(--pad);box-sizing:border-box; font-weight:700;} /* TODO: todo el texto en negrilla */
+        html,body{margin:0;padding:0;background:#fff;color:#000;font-family:var(--mono);font-size:12px;font-weight:700;}
+        .ticket{width:100%;max-width:320px;padding:var(--pad);box-sizing:border-box;font-weight:700;}
         @media print { body{width:<?= $width ?>;} .no-print{display:none;} }
 
         /* Encabezado */
-        .title{font-weight:700;text-align:center;font-size:14px;margin-bottom:6px;}
-        .subtitle{font-size:12px;text-align:center;margin-bottom:6px;}
+        .title{font-weight:900;text-align:center;font-size:14px;margin-bottom:6px;color:#000;}
+        .subtitle{font-weight:800;font-size:12px;text-align:center;margin-bottom:6px;color:#000;}
 
         /* Líneas y bloques */
         .sep{border-top:1px dashed #000;margin:8px 0;}
-        .row{display:flex;justify-content:space-between;align-items:flex-start;margin:4px 0;line-height:1.25;}
-        .label{flex:1;color:#222;font-size:12px;}
-        .value{flex:1;text-align:right;font-weight:700;}
-        .small{font-size:var(--small);color:#555;}
-        .muted{font-size:11px;color:#444;margin-top:4px;}
+        .row{display:flex;justify-content:space-between;align-items:flex-start;margin:4px 0;line-height:1.25;font-weight:700;color:#000;}
+        .label{flex:1;color:#000;font-size:12px;font-weight:700;}
+        .value{flex:1;text-align:right;font-weight:900;color:#000;}
+        /* Asegurar que las fechas y horas también salgan en negrilla y en negro oscuro */
+        .small{font-size:var(--small);color:#000;font-weight:900;}
+        .muted{font-size:11px;color:#000;margin-top:4px;font-weight:700;}
 
         /* Fecha/hora en bloque compacto */
-        .meta{display:flex;flex-direction:column;gap:2px;font-size:11px;color:#333;margin-top:6px;}
-        .meta .time{color:#666;font-size:10px;}
+        .meta{display:flex;flex-direction:column;gap:2px;font-size:11px;color:#000;margin-top:6px;font-weight:900;}
+        .meta .time{color:#000;font-size:10px;font-weight:900;}
 
         /* Ajustes para textos largos */
-        .wrap{white-space:normal;word-break:break-word;}
-        .center{ text-align:center; }
+        .wrap{white-space:normal;word-break:break-word;font-weight:700;color:#000;}
+        .center{ text-align:center;font-weight:800;color:#000; }
 
         /* Footer */
-        .thanks{margin-top:10px;text-align:center;font-size:12px;}
+        .thanks{margin-top:10px;text-align:center;font-size:12px;font-weight:700;color:#000;}
         .no-print{margin-top:10px;text-align:center;}
-        button{padding:8px 12px;border-radius:6px;border:0;background:#0078d4;color:#fff;cursor:pointer;}
+        button{padding:8px 12px;border-radius:6px;border:0;background:#0078d4;color:#fff;cursor:pointer;font-weight:700;}
       </style>
     </head>
     <body>
@@ -391,18 +395,19 @@ $qrUrl = "https://chart.googleapis.com/chart?chs=150x150&cht=qr&chl=" . rawurlen
 // --- HTML inicio (fijo a 80mm) ---
 $html = "<!doctype html><html><head><meta charset='utf-8'><title>Factura</title>";
 $html .= "<style>
-body{font-family:monospace;margin:0;padding:6px;color:#000}
-.print-area{max-width:320px;margin:0 auto}
-.items{width:100%;border-collapse:collapse;margin-top:6px}
-.items td{padding:2px 0;vertical-align:top}
-.sep{border-top:1px dashed #000;margin:6px 0}
-.total{font-weight:bold;font-size:13px}
+/* Forzar negrilla en todo el recibo, incluyendo fechas y horas, y asegurar color negro oscuro */
+body{font-family:monospace;margin:0;padding:6px;color:#000;font-weight:700;}
+.print-area{max-width:320px;margin:0 auto;font-weight:700;color:#000;}
+.items{width:100%;border-collapse:collapse;margin-top:6px;font-weight:700;color:#000;}
+.items td{padding:2px 0;vertical-align:top;font-weight:700;color:#000;}
+.sep{border-top:1px dashed #000;margin:6px 0;}
+.total{font-weight:900;font-size:13px;color:#000;}
 .logo{max-width:160px;max-height:60px;margin-bottom:6px;}
 .qr{width:70px;height:70px;}
-.center{text-align:center}
-.small{font-size:11px}
-.tiny{font-size:10px}
-.no-print{display:block}
+.center{text-align:center;font-weight:800;color:#000;}
+.small{font-size:11px;font-weight:900;color:#000;}
+.tiny{font-size:10px;font-weight:900;color:#000;}
+.no-print{display:block;}
 @media print {.no-print{display:none}}
 </style>";
 $html .= "</head><body>";
@@ -413,19 +418,19 @@ if (!empty($company['logo'] ?? '')) {
     $logoEsc = htmlspecialchars($company['logo'] ?? '');
     $html .= "<div class='center'><img src='{$logoEsc}' alt='Logo' class='logo'></div>";
 }
-$html .= "<div class='center' style='font-weight:bold;font-size:14px;'>".htmlspecialchars($company['name'] ?? '')."</div>";
-$html .= "<div class='center small'>NIT: ".htmlspecialchars($company['nit'] ?? '')."</div>";
-$html .= "<div class='center small'>".htmlspecialchars($company['address'] ?? '')."</div>";
+$html .= "<div class='center' style='font-weight:bold;font-size:14px;color:#000;'>".htmlspecialchars($company['name'] ?? '')."</div>";
+$html .= "<div class='center small' style='color:#000;'>NIT: ".htmlspecialchars($company['nit'] ?? '')."</div>";
+$html .= "<div class='center small' style='color:#000;'>".htmlspecialchars($company['address'] ?? '')."</div>";
 if (!empty($company['phone'] ?? '')) {
-    $html .= "<div class='center small'>Tel: ".htmlspecialchars($company['phone'] ?? '')."</div>";
+    $html .= "<div class='center small' style='color:#000;'>Tel: ".htmlspecialchars($company['phone'] ?? '')."</div>";
 }
 $html .= "<div class='center'><img src='{$qrUrl}' alt='QR' class='qr'></div>";
 
 $html .= "<div class='sep'></div>";
 $html .= "<div class='small'>Factura: <strong>".htmlspecialchars($invoiceData['number'] ?? '')."</strong></div>";
-$html .= "<div class='small'>Fecha: ".htmlspecialchars($invoiceData['date'] ?? '')."</div>";
-$html .= "<div class='small'>Cajero: ".htmlspecialchars($invoiceData['cashier'] ?? '')."</div>";
-$html .= "<div class='small'>Cliente: ".htmlspecialchars($invoiceData['customer'] ?? '')."</div>";
+$html .= "<div class='small'>Fecha: <strong style='color:#000;'>".htmlspecialchars($invoiceData['date'] ?? '')."</strong></div>";
+$html .= "<div class='small'>Cajero: <strong style='color:#000;'>".htmlspecialchars($invoiceData['cashier'] ?? '')."</strong></div>";
+$html .= "<div class='small'>Cliente: <strong style='color:#000;'>".htmlspecialchars($invoiceData['customer'] ?? '')."</strong></div>";
 
 // Items
 $html .= "<table class='items tiny'><tbody>{$itemsHtml}</tbody></table>";
@@ -453,7 +458,7 @@ if ($changeGiven > 0) {
 }
 
 $html .= "<div class='sep'></div>";
-$html .= "<div class='tiny'>".htmlspecialchars($company['legend'] ?? '')."</div>";
+$html .= "<div class='tiny' style='color:#000;'>".htmlspecialchars($company['legend'] ?? '')."</div>";
 $html .= "<div style='height:20px;'></div>";
 
 // Botones de acción (ocultos al imprimir)
