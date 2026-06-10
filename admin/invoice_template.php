@@ -190,7 +190,7 @@ $previewHtml = render_preview($display_template, $previewData);
 
 <div class="help">
   <strong>Instrucciones</strong>: selecciona la sucursal para editar sus datos y su plantilla de factura. Si no existe plantilla por sucursal, se usa la plantilla global. Guarda los cambios para que se apliquen al imprimir desde esa sucursal.
-  
+  <a href="/mi_tienda/admin/dashboard.php">Atras</a>
 </div>
 
 <?php if ($msg): ?><div class="msg"><?=htmlspecialchars($msg)?></div><?php endif; ?>
