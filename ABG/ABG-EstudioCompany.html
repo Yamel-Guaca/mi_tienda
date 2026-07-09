@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title id="pageTitle">ABG — Construimos tu presencia digital</title>
+<meta id="pageDesc" name="description" content="Páginas web, tiendas online y automatizaciones para tu negocio, sin importar en qué país estés.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0B2545;--bg-deep:#081B36;--surface:#0F2E54;--surface-2:#123A63;
+  --line:rgba(191,227,240,0.12);--line-strong:rgba(191,227,240,0.3);
+  --ink:#EAF2F8;--ink-dim:#92AFC6;
+  --accent:#FF6B4A;--accent-2:#D9A441;--cyan:#7DD3E8;
+  --maxw:1120px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--ink);font-family:'Inter',sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased;}
+img,svg{display:block;max-width:100%;}
+a{color:inherit;text-decoration:none;}
+ul{list-style:none;}
+h1,h2,h3{font-family:'Space Grotesk',sans-serif;font-weight:700;letter-spacing:-0.01em;}
+.mono{font-family:'JetBrains Mono',monospace;}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px;}
+.eyebrow{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-2);}
+a:focus-visible,button:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}
+.blueprint-grid{background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:36px 36px;}
+.dim-divider{position:relative;height:1px;background:var(--line-strong);margin:0 24px;}
+.dim-divider::before,.dim-divider::after{content:"";position:absolute;top:-3px;width:1px;height:7px;background:var(--line-strong);}
+.dim-divider::before{left:0;}.dim-divider::after{right:0;}
+
+/* ====== KEYFRAMES ====== */
+@keyframes drift{0%,100%{transform:translate(0,0);opacity:.12}33%{transform:translate(12px,-18px);opacity:.22}66%{transform:translate(-8px,10px);opacity:.08}}
+@keyframes ring-pulse{0%,100%{opacity:.12;transform:scale(1)}50%{opacity:.28;transform:scale(1.1)}}
+@keyframes shimmer{0%{background-position:200% center}100%{background-position:-200% center}}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes scroll-x{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@keyframes card-enter{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes glow-border{0%,100%{box-shadow:0 0 0 0 rgba(125,211,232,0)}50%{box-shadow:0 0 0 3px rgba(125,211,232,.18)}}
+@keyframes badge-pop{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:scale(1)}}
+@keyframes count-up-fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes spin-slow{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
+/* ====== SCROLL REVEAL ====== */
+.reveal{opacity:0;transform:translateY(26px);transition:opacity .6s ease,transform .6s ease;}
+.reveal.is-visible{opacity:1;transform:none;}
+.reveal-d1{transition-delay:.08s;}.reveal-d2{transition-delay:.16s;}
+.reveal-d3{transition-delay:.24s;}.reveal-d4{transition-delay:.32s;}
+@media(prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none;}
+  .hero-bg .dot,.hero-bg .ring{animation:none;}}
+
+/* ====== HEADER ====== */
+header{position:sticky;top:0;z-index:50;background:rgba(8,27,54,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line-strong);}
+.nav-row{display:flex;align-items:center;justify-content:space-between;height:64px;}
+.brand{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;}
+.brand-mark{width:28px;height:28px;color:var(--accent-2);flex-shrink:0;}
+.brand-text .name{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;letter-spacing:.06em;}
+.brand-text .tag{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.18em;color:var(--ink-dim);text-transform:uppercase;margin-top:1px;display:block;}
+nav.links{display:none;gap:28px;align-items:center;}
+nav.links a{font-family:'JetBrains Mono',monospace;font-size:12.5px;letter-spacing:.04em;color:var(--ink-dim);transition:color .15s;position:relative;}
+nav.links a::after{content:'';position:absolute;bottom:-2px;left:0;width:0;height:1px;background:var(--cyan);transition:width .2s;}
+nav.links a:hover{color:var(--ink);}
+nav.links a:hover::after{width:100%;}
+select#countrySelect{background:var(--surface-2);border:1px solid var(--line-strong);color:var(--ink);font-family:'JetBrains Mono',monospace;font-size:11.5px;padding:7px 10px;border-radius:2px;appearance:none;cursor:pointer;max-width:170px;}
+.nav-toggle{display:flex;background:none;border:1px solid var(--line-strong);color:var(--ink);width:38px;height:38px;align-items:center;justify-content:center;border-radius:2px;cursor:pointer;}
+#mobileMenu{display:none;border-top:1px solid var(--line-strong);padding:16px 0 20px;}
+#mobileMenu.open{display:block;}
+#mobileMenu a{display:block;padding:10px 0;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--ink-dim);}
+@media(min-width:860px){nav.links{display:flex;}.nav-toggle{display:none;}#mobileMenu{display:none !important;}}
+
+/* ====== HERO ====== */
+.hero{position:relative;padding:64px 0 56px;overflow:hidden;}
+.hero-bg{position:absolute;inset:0;pointer-events:none;z-index:0;}
+.hero-bg .dot{position:absolute;border-radius:50%;background:var(--cyan);animation:drift var(--dur,6s) ease-in-out infinite;animation-delay:var(--del,0s);}
+.hero-bg .ring{position:absolute;border-radius:50%;border:1px solid rgba(125,211,232,.2);animation:ring-pulse var(--dur,6s) ease-in-out infinite;animation-delay:var(--del,0s);}
+.hero .wrap{position:relative;z-index:1;}
+.hero-inner{display:grid;gap:36px;}
+.hero h1{font-size:clamp(32px,6vw,52px);line-height:1.05;max-width:14ch;}
+.hl{
+  background:linear-gradient(120deg,var(--accent) 0%,var(--accent-2) 55%,#ff9a6c 100%);
+  background-size:200% auto;
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  animation:shimmer 4s linear infinite;
+}
+.hero p.lede{margin-top:18px;font-size:17px;color:var(--ink-dim);max-width:42ch;}
+.hero-ctas{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px;}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:13px 22px;font-family:'JetBrains Mono',monospace;font-size:13px;letter-spacing:.03em;border-radius:2px;border:1px solid transparent;cursor:pointer;transition:transform .15s,border-color .15s;}
+.btn:hover{transform:translateY(-2px);}
+.btn-primary{background:linear-gradient(90deg,var(--accent),#ff8c6e,var(--accent));background-size:200% auto;animation:shimmer 3s linear infinite;color:#1a0e08;border:none;}
+.btn-ghost{border-color:var(--line-strong);color:var(--ink);}
+.btn-ghost:hover{border-color:var(--cyan);}
+.title-block{margin-top:40px;border:1px solid var(--line-strong);background:var(--surface);padding:14px 18px;display:inline-grid;gap:6px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-dim);letter-spacing:.04em;}
+.title-block span b{color:var(--ink);font-weight:500;}
+.hero-svg-wrap{border:1px solid var(--line-strong);background:var(--surface);padding:20px;}
+.hero-svg path{fill:none;stroke:var(--cyan);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1000;stroke-dashoffset:1000;animation:draw 1.6s ease forwards;}
+.hero-svg path.accent-line{stroke:var(--accent-2);}
+.hero-svg path:nth-child(1){animation-delay:0s;}.hero-svg path:nth-child(2){animation-delay:.12s;}
+.hero-svg path:nth-child(3){animation-delay:.24s;}.hero-svg path:nth-child(4){animation-delay:.36s;}
+.hero-svg path:nth-child(5){animation-delay:.48s;}.hero-svg path:nth-child(6){animation-delay:.6s;}
+.hero-svg text{font-family:'JetBrains Mono',monospace;font-size:7px;fill:var(--ink-dim);letter-spacing:.06em;}
+@media(min-width:860px){.hero-inner{grid-template-columns:1.1fr 1fr;align-items:center;}}
+
+/* ====== STATS BAR ====== */
+.stats-bar{background:var(--bg-deep);border-top:1px solid var(--line-strong);border-bottom:1px solid var(--line-strong);padding:20px 0;}
+.stats-inner{display:flex;flex-wrap:wrap;justify-content:center;gap:32px 48px;}
+.stat-item{text-align:center;}
+.stat-num{font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;color:var(--cyan);display:block;animation:count-up-fade .6s ease forwards;}
+.stat-label{font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);}
+
+/* ====== MARQUEE ====== */
+.marquee{border-top:1px solid var(--line-strong);border-bottom:1px solid var(--line-strong);background:var(--bg-deep);padding:13px 0;overflow:hidden;white-space:nowrap;}
+.marquee-track{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.1em;color:var(--ink-dim);animation:scroll-x 28s linear infinite;}
+
+/* ====== SECTIONS ====== */
+section{padding:72px 0;}
+.section-head{margin-bottom:36px;max-width:54ch;}
+.section-head h2{font-size:clamp(24px,4vw,34px);margin-top:8px;}
+.section-head p{color:var(--ink-dim);margin-top:10px;font-size:15px;}
+
+/* ====== SERVICE CATALOG ====== */
+.services-grid{display:grid;gap:16px;grid-template-columns:1fr;}
+@media(min-width:700px){.services-grid{grid-template-columns:1fr 1fr;}}
+.service-card{
+  position:relative;background:var(--surface);border:1px solid var(--line-strong);padding:24px;cursor:pointer;
+  transition:border-color .2s,box-shadow .2s,transform .18s;
+}
+.service-card:hover{
+  border-color:rgba(125,211,232,.55);
+  box-shadow:0 0 28px rgba(125,211,232,.12),0 6px 28px rgba(0,0,0,.25);
+  transform:translateY(-2px);
+}
+.service-card[aria-expanded="true"]{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan) inset;}
+.sheet-no{position:absolute;top:18px;right:20px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent-2);letter-spacing:.05em;}
+.service-icon{width:30px;height:30px;color:var(--cyan);margin-bottom:18px;transition:transform .2s;}
+.service-card:hover .service-icon{transform:scale(1.12);}
+.service-card h3{font-size:18px;margin-bottom:8px;}
+.service-card p.desc{color:var(--ink-dim);font-size:14.5px;}
+.service-affordance{display:flex;align-items:center;gap:6px;margin-top:16px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--cyan);}
+.chevron-icon{width:13px;height:13px;transition:transform .3s ease;}
+.service-card[aria-expanded="true"] .chevron-icon{transform:rotate(180deg);}
+.service-detail{max-height:0;overflow:hidden;opacity:0;transition:max-height .45s ease,opacity .3s ease;}
+.service-card[aria-expanded="true"] .service-detail{max-height:480px;opacity:1;margin-top:20px;}
+.detail-label{display:block;color:var(--accent-2);font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;}
+.detail-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px;padding-top:14px;border-top:1px dashed var(--line-strong);flex-wrap:wrap;}
+.spec-list{display:grid;gap:10px;}
+.spec-list li{display:flex;gap:10px;align-items:flex-start;font-size:14.5px;color:var(--ink-dim);}
+.spec-list li::before{content:"";width:6px;height:6px;background:var(--accent);margin-top:6px;flex-shrink:0;}
+
+/* ====== PAYMENT METHODS (public) ====== */
+.payments-section{padding:60px 0;background:var(--bg-deep);border-top:1px solid var(--line-strong);border-bottom:1px solid var(--line-strong);}
+.payments-grid{display:grid;gap:24px;}
+@media(min-width:700px){.payments-grid{grid-template-columns:1fr 1fr;}}
+.pay-group h4{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-2);margin-bottom:14px;}
+.pay-badges{display:flex;flex-wrap:wrap;gap:10px;}
+.pay-badge{
+  display:inline-flex;align-items:center;gap:8px;
+  background:var(--surface);border:1px solid var(--line-strong);
+  padding:8px 14px;font-size:13.5px;
+  animation:badge-pop .3s ease both;
+}
+.pay-badge .pay-icon{font-size:16px;}
+.pay-badge .pay-info{display:flex;flex-direction:column;}
+.pay-badge .pay-name{font-weight:600;font-size:13px;line-height:1.2;}
+.pay-badge .pay-val{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-dim);}
+.no-payments{color:var(--ink-dim);font-size:14px;}
+
+/* ====== PORTFOLIO ====== */
+.portfolio-card{background:var(--surface);border:1px solid var(--line-strong);padding:30px;display:grid;gap:20px;}
+@media(min-width:760px){.portfolio-card{grid-template-columns:1fr 1fr;}}
+.portfolio-card h3{font-size:20px;margin-bottom:6px;}
+.portfolio-card .role{color:var(--accent-2);font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px;display:block;}
+.caption{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink-dim);border-top:1px dashed var(--line-strong);padding-top:14px;margin-top:4px;}
+
+/* ====== PROCESS ====== */
+.process-grid{display:grid;gap:24px;}
+@media(min-width:760px){.process-grid{grid-template-columns:repeat(3,1fr);}}
+.step{padding-top:18px;border-top:1px solid var(--line-strong);}
+.step .num{font-family:'JetBrains Mono',monospace;color:var(--accent-2);font-size:13px;}
+.step h3{font-size:17px;margin:8px 0 6px;}
+.step p{color:var(--ink-dim);font-size:14.5px;}
+
+/* ====== PRICING ====== */
+.price-table{border:1px solid var(--line-strong);background:var(--surface);}
+.price-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:18px 22px;border-bottom:1px solid var(--line);transition:background .15s;}
+.price-row:last-child{border-bottom:none;}
+.price-row:hover{background:rgba(125,211,232,.04);}
+.price-name{font-size:15.5px;font-weight:500;}
+.price-sub{color:var(--ink-dim);font-size:13px;margin-top:2px;}
+.price-right{display:flex;align-items:center;gap:18px;}
+.price-value{font-family:'JetBrains Mono',monospace;color:var(--accent-2);font-size:15px;white-space:nowrap;}
+.price-cta{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--cyan);border:1px solid var(--line-strong);padding:8px 12px;white-space:nowrap;transition:border-color .15s,background .15s;}
+.price-cta:hover{border-color:var(--cyan);background:rgba(125,211,232,.06);}
+.price-hint{margin-top:14px;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--ink-dim);}
+
+/* ====== CONTACT ====== */
+.contact-box{background:var(--surface);border:1px solid var(--line-strong);padding:40px 28px;text-align:center;}
+.contact-box h2{font-size:clamp(24px,4vw,32px);margin-bottom:12px;}
+.contact-box p{color:var(--ink-dim);max-width:40ch;margin:0 auto 26px;}
+.phone-display{margin-top:18px;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--ink-dim);}
+.lang-note{margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--ink-dim);}
+
+/* ====== FOOTER ====== */
+footer{border-top:1px solid var(--line-strong);padding:28px 0;}
+.footer-row{display:flex;flex-direction:column;gap:8px;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--ink-dim);}
+@media(min-width:700px){.footer-row{flex-direction:row;justify-content:space-between;}}
+
+/* ====== ADMIN OVERLAY ====== */
+#adminOverlay{position:fixed;inset:0;z-index:900;background:rgba(5,18,36,.97);backdrop-filter:blur(10px);display:none;overflow-y:auto;}
+#adminOverlay.open{display:block;}
+.admin-header{display:flex;align-items:center;justify-content:space-between;padding:20px 28px;border-bottom:1px solid var(--line-strong);}
+.admin-header h2{font-family:'JetBrains Mono',monospace;font-size:15px;color:var(--accent-2);letter-spacing:.08em;}
+.admin-close{background:none;border:1px solid var(--line-strong);color:var(--ink);width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;border-radius:2px;}
+.admin-close:hover{border-color:var(--accent);}
+
+/* Login */
+.admin-login{max-width:360px;margin:80px auto;padding:0 24px;text-align:center;}
+.admin-login h3{font-family:'Space Grotesk',sans-serif;font-size:22px;margin-bottom:8px;}
+.admin-login p{color:var(--ink-dim);font-size:14px;margin-bottom:28px;}
+.admin-input{width:100%;background:var(--surface);border:1px solid var(--line-strong);color:var(--ink);padding:12px 16px;font-family:'JetBrains Mono',monospace;font-size:14px;border-radius:2px;margin-bottom:14px;}
+.admin-input:focus{outline:none;border-color:var(--cyan);}
+.admin-btn{width:100%;padding:12px;background:var(--accent);color:#1a0e08;border:none;font-family:'JetBrains Mono',monospace;font-size:13px;cursor:pointer;border-radius:2px;}
+.admin-btn:hover{background:#ff7c5d;}
+.admin-err{color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:12px;margin-top:8px;display:none;}
+
+/* Dashboard */
+.admin-dash{display:none;padding:28px;}
+.admin-dash.visible{display:block;}
+.admin-tabs{display:flex;gap:0;border-bottom:1px solid var(--line-strong);margin-bottom:28px;overflow-x:auto;}
+.admin-tab{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.04em;padding:10px 18px;background:none;border:none;border-bottom:2px solid transparent;color:var(--ink-dim);cursor:pointer;white-space:nowrap;transition:color .15s,border-color .15s;}
+.admin-tab.active{color:var(--cyan);border-bottom-color:var(--cyan);}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+.tab-panel h4{font-family:'Space Grotesk',sans-serif;font-size:16px;margin-bottom:20px;color:var(--ink);}
+.tab-panel .hint{font-size:13px;color:var(--ink-dim);margin-bottom:20px;}
+.pay-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--line);}
+.pay-row:last-of-type{border-bottom:none;}
+.pay-row label.chk{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;min-width:150px;}
+.pay-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--cyan);}
+.pay-row .admin-input{margin:0;flex:1;min-width:180px;}
+.save-row{margin-top:24px;display:flex;align-items:center;gap:14px;}
+.save-btn{padding:11px 22px;background:var(--cyan);color:var(--bg-deep);border:none;font-family:'JetBrains Mono',monospace;font-size:12px;cursor:pointer;border-radius:2px;}
+.save-btn:hover{background:#93dded;}
+.save-ok{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--cyan);display:none;}
+.admin-section-label{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-2);margin:20px 0 10px;}
+</style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header class="blueprint-grid">
+  <div class="wrap nav-row">
+    <div class="brand" id="brandLogo" title="ABG studio digital">
+      <svg class="brand-mark" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.4">
+        <circle cx="14" cy="14" r="10"/>
+        <path d="M14 4v20M4 14h20"/>
+        <path d="M8 8l12 12" stroke-dasharray="2.5 2"/>
+        <circle cx="14" cy="14" r="3" fill="currentColor" stroke="none" opacity=".5"/>
+      </svg>
+      <div class="brand-text">
+        <span class="name">ABG</span>
+        <span class="tag" data-i18n="brand.tag">studio digital</span>
+      </div>
+    </div>
+
+    <nav class="links">
+      <a href="#servicios" data-i18n="nav.services">Servicios</a>
+      <a href="#pagos" data-i18n="nav.pagos">Pagos</a>
+      <a href="#portafolio" data-i18n="nav.portfolio">Portafolio</a>
+      <a href="#precios" data-i18n="nav.pricing">Precios</a>
+      <a href="#contacto" data-i18n="nav.contact">Contacto</a>
+    </nav>
+
+    <div style="display:flex;align-items:center;gap:10px;">
+      <select id="countrySelect">
+        <option value="intl" data-lang="es" data-currency="USD" selected>🌐 Internacional</option>
+        <option value="co" data-lang="es" data-currency="COP">🇨🇴 Colombia</option>
+        <option value="mx" data-lang="es" data-currency="USD">🇲🇽 México</option>
+        <option value="pe" data-lang="es" data-currency="USD">🇵🇪 Perú</option>
+        <option value="cl" data-lang="es" data-currency="USD">🇨🇱 Chile</option>
+        <option value="ar" data-lang="es" data-currency="USD">🇦🇷 Argentina</option>
+        <option value="es" data-lang="es" data-currency="USD">🇪🇸 España</option>
+        <option value="ec" data-lang="es" data-currency="USD">🇪🇨 Ecuador</option>
+        <option value="us" data-lang="en" data-currency="USD">🇺🇸 United States</option>
+      </select>
+      <button class="nav-toggle" id="navToggle" aria-label="Abrir menú" aria-expanded="false">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="wrap" id="mobileMenu">
+    <a href="#servicios" data-i18n="nav.services">Servicios</a>
+    <a href="#pagos" data-i18n="nav.pagos">Pagos</a>
+    <a href="#portafolio" data-i18n="nav.portfolio">Portafolio</a>
+    <a href="#precios" data-i18n="nav.pricing">Precios</a>
+    <a href="#contacto" data-i18n="nav.contact">Contacto</a>
+  </div>
+</header>
+
+<main>
+<!-- ===== HERO ===== -->
+<section class="hero blueprint-grid">
+  <div class="hero-bg">
+    <div class="dot" style="width:5px;height:5px;top:20%;left:12%;--dur:7s;--del:0s;"></div>
+    <div class="dot" style="width:7px;height:7px;top:65%;left:78%;--dur:9s;--del:1.2s;"></div>
+    <div class="dot" style="width:4px;height:4px;top:40%;left:55%;--dur:5.5s;--del:.4s;"></div>
+    <div class="dot" style="width:6px;height:6px;top:80%;left:25%;--dur:8s;--del:2s;"></div>
+    <div class="dot" style="width:3px;height:3px;top:15%;left:68%;--dur:6.5s;--del:.8s;"></div>
+    <div class="ring" style="width:110px;height:110px;top:8%;left:6%;--dur:8s;--del:0s;"></div>
+    <div class="ring" style="width:70px;height:70px;top:55%;left:82%;--dur:6.5s;--del:1.5s;"></div>
+    <div class="ring" style="width:150px;height:150px;top:38%;left:42%;--dur:11s;--del:1s;"></div>
+  </div>
+  <div class="wrap hero-inner">
+    <div>
+      <p class="eyebrow" data-i18n="hero.eyebrow">Desarrollo digital remoto</p>
+      <h1 data-i18n="hero.h1">Construimos tu <span class="hl">presencia digital</span>, sin importar dónde estés.</h1>
+      <p class="lede" data-i18n="hero.lede">Páginas, tiendas y automatizaciones hechas a la medida de tu negocio. Trabajo remoto, entrega rápida, sin tecnicismos.</p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" id="heroWaBtn" target="_blank" rel="noopener noreferrer" data-i18n="hero.cta1">Cotizar por WhatsApp</a>
+        <a class="btn btn-ghost" href="#servicios" data-i18n="hero.cta2">Ver servicios</a>
+      </div>
+      <div class="title-block mono">
+        <span data-i18n="hero.tb1">PROYECTO: <b>PRESENCIA DIGITAL</b></span>
+        <span data-i18n="hero.tb2">ALCANCE: <b>GLOBAL</b></span>
+        <span data-i18n="hero.tb3">ESCALA: <b>A TU MEDIDA</b></span>
+      </div>
+    </div>
+    <div class="hero-svg-wrap">
+      <svg class="hero-svg" viewBox="0 0 320 220" width="100%" height="auto">
+        <path d="M14 14 H306 V206 H14 Z"/>
+        <path class="accent-line" d="M14 40 H306"/>
+        <path d="M28 26 a4 4 0 1 0 0.1 0 M44 26 a4 4 0 1 0 0.1 0 M60 26 a4 4 0 1 0 0.1 0"/>
+        <path d="M30 60 H160 M30 76 H210 M30 92 H120"/>
+        <path class="accent-line" d="M30 116 H110 V146 H30 Z"/>
+        <path d="M140 116 H290 M140 132 H290 M140 148 H230"/>
+        <text x="20" y="186" data-i18n="hero.svg1">100% RESPONSIVE</text>
+        <text x="20" y="198" data-i18n="hero.svg2">HECHO A TU MEDIDA</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STATS ===== -->
+<div class="stats-bar">
+  <div class="wrap stats-inner">
+    <div class="stat-item"><span class="stat-num" data-target="9">9+</span><span class="stat-label" data-i18n="stats.countries">Países</span></div>
+    <div class="stat-item"><span class="stat-num" data-target="100">100%</span><span class="stat-label" data-i18n="stats.mobile">Mobile-first</span></div>
+    <div class="stat-item"><span class="stat-num" data-target="3">3</span><span class="stat-label" data-i18n="stats.days">Días de entrega</span></div>
+    <div class="stat-item"><span class="stat-num" data-target="0">0</span><span class="stat-label" data-i18n="stats.servers">Servidores complicados</span></div>
+  </div>
+</div>
+
+<!-- ===== MARQUEE ===== -->
+<div class="marquee">
+  <span class="marquee-track">COLOMBIA · MÉXICO · PERÚ · CHILE · ARGENTINA · ESPAÑA · ESTADOS UNIDOS · ECUADOR · &nbsp; COLOMBIA · MÉXICO · PERÚ · CHILE · ARGENTINA · ESPAÑA · ESTADOS UNIDOS · ECUADOR · &nbsp;</span>
+</div>
+
+<!-- ===== SERVICES ===== -->
+<section id="servicios">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <p class="eyebrow" data-i18n="services.eyebrow">Qué construimos</p>
+      <h2 data-i18n="services.h2">Cuatro formas de poner tu negocio en línea</h2>
+      <p data-i18n="services.sub">Elige lo que necesitas hoy. Toca cada tarjeta para ver qué incluye.</p>
+    </div>
+    <div class="services-grid">
+
+      <article class="service-card reveal reveal-d1" tabindex="0" role="button" aria-expanded="false" data-card="svc1">
+        <span class="sheet-no mono">LP·01</span>
+        <svg class="service-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="4" width="18" height="13" rx="0.5"/><path d="M3 8h18M9 21h6M12 17v4"/></svg>
+        <h3 data-i18n="svc1.title">Página de presentación</h3>
+        <p class="desc" data-i18n="svc1.desc">Una sola página clara para mostrar lo que haces, con botón directo a WhatsApp. Ideal si recién empiezas.</p>
+        <div class="service-affordance">
+          <span class="aff-text" data-i18n="common.view">Ver detalle</span>
+          <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <div class="service-detail">
+          <span class="detail-label mono" data-i18n="common.includes">Incluye:</span>
+          <ul class="spec-list">
+            <li data-i18n="svc1.b1">1 página, diseño a tu medida</li>
+            <li data-i18n="svc1.b2">Botón directo a WhatsApp</li>
+            <li data-i18n="svc1.b3">Optimizada para celular</li>
+            <li data-i18n="svc1.b4">Entrega en archivo único, listo para usar</li>
+          </ul>
+          <div class="detail-footer">
+            <span class="price-value mono" data-cop="Desde $180.000 COP" data-usd="Desde $45 USD"></span>
+            <a class="price-cta wa-cta" data-svc="svc1" target="_blank" rel="noopener noreferrer" data-i18n="common.quote">Cotizar este servicio</a>
+          </div>
+        </div>
+      </article>
+
+      <article class="service-card reveal reveal-d2" tabindex="0" role="button" aria-expanded="false" data-card="svc2">
+        <span class="sheet-no mono">TC·02</span>
+        <svg class="service-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M6 8h12l-1 12H7L6 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>
+        <h3 data-i18n="svc2.title">Tienda o catálogo online</h3>
+        <p class="desc" data-i18n="svc2.desc">Vitrina con tus productos, métodos de pago locales y gestión de pedidos. Pensada para vender de verdad.</p>
+        <div class="service-affordance">
+          <span class="aff-text" data-i18n="common.view">Ver detalle</span>
+          <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <div class="service-detail">
+          <span class="detail-label mono" data-i18n="common.includes">Incluye:</span>
+          <ul class="spec-list">
+            <li data-i18n="svc2.b1">Catálogo de productos con fotos y precios</li>
+            <li data-i18n="svc2.b2">Métodos de pago locales integrados</li>
+            <li data-i18n="svc2.b3">Panel para gestionar pedidos</li>
+            <li data-i18n="svc2.b4">Confirmación de envío automática</li>
+          </ul>
+          <div class="detail-footer">
+            <span class="price-value mono" data-cop="Desde $450.000 COP" data-usd="Desde $115 USD"></span>
+            <a class="price-cta wa-cta" data-svc="svc2" target="_blank" rel="noopener noreferrer" data-i18n="common.quote">Cotizar este servicio</a>
+          </div>
+        </div>
+      </article>
+
+      <article class="service-card reveal reveal-d3" tabindex="0" role="button" aria-expanded="false" data-card="svc3">
+        <span class="sheet-no mono">AU·03</span>
+        <svg class="service-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>
+        <h3 data-i18n="svc3.title">Automatizaciones</h3>
+        <p class="desc" data-i18n="svc3.desc">Respuestas automáticas, recordatorios y formularios que trabajan mientras tú atiendes tu negocio.</p>
+        <div class="service-affordance">
+          <span class="aff-text" data-i18n="common.view">Ver detalle</span>
+          <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <div class="service-detail">
+          <span class="detail-label mono" data-i18n="common.includes">Incluye:</span>
+          <ul class="spec-list">
+            <li data-i18n="svc3.b1">Respuestas automáticas por WhatsApp</li>
+            <li data-i18n="svc3.b2">Recordatorios programados</li>
+            <li data-i18n="svc3.b3">Formularios que organizan la información sola</li>
+            <li data-i18n="svc3.b4">Se conecta con lo que ya usas</li>
+          </ul>
+          <div class="detail-footer">
+            <span class="price-value mono" data-cop="Desde $350.000 COP" data-usd="Desde $90 USD"></span>
+            <a class="price-cta wa-cta" data-svc="svc3" target="_blank" rel="noopener noreferrer" data-i18n="common.quote">Cotizar este servicio</a>
+          </div>
+        </div>
+      </article>
+
+      <article class="service-card reveal reveal-d4" tabindex="0" role="button" aria-expanded="false" data-card="svc4">
+        <span class="sheet-no mono">MN·04</span>
+        <svg class="service-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M14.7 6.3a4 4 0 0 1-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 1 5.4-5.4L21 6l-3-3-3.3 3.3Z"/></svg>
+        <h3 data-i18n="svc4.title">Mantenimiento mensual</h3>
+        <p class="desc" data-i18n="svc4.desc">Actualizamos contenido y corregimos detalles para que todo siga funcionando sin que tú toques código.</p>
+        <div class="service-affordance">
+          <span class="aff-text" data-i18n="common.view">Ver detalle</span>
+          <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <div class="service-detail">
+          <span class="detail-label mono" data-i18n="common.includes">Incluye:</span>
+          <ul class="spec-list">
+            <li data-i18n="svc4.b1">Cambios de contenido cuando los necesites</li>
+            <li data-i18n="svc4.b2">Corrección de detalles</li>
+            <li data-i18n="svc4.b3">Soporte directo por WhatsApp</li>
+            <li data-i18n="svc4.b4">Revisión mensual de que todo funcione</li>
+          </ul>
+          <div class="detail-footer">
+            <span class="price-value mono" data-cop="$80.000 COP /mes" data-usd="$20 USD /mes"></span>
+            <a class="price-cta wa-cta" data-svc="svc4" target="_blank" rel="noopener noreferrer" data-i18n="common.quote">Cotizar este servicio</a>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<div class="dim-divider"></div>
+
+<!-- ===== PAYMENT METHODS (public) ===== -->
+<section class="payments-section" id="pagos">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <p class="eyebrow" data-i18n="pay.eyebrow">Cómo nos puedes pagar</p>
+      <h2 data-i18n="pay.h2">Métodos de pago aceptados</h2>
+      <p data-i18n="pay.sub">Trabajamos con múltiples opciones según tu país.</p>
+    </div>
+    <div class="payments-grid" id="paymentsDisplay">
+      <!-- Populated by JS from localStorage -->
+    </div>
+  </div>
+</section>
+
+<div class="dim-divider"></div>
+
+<!-- ===== PORTFOLIO ===== -->
+<section id="portafolio">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <p class="eyebrow" data-i18n="portfolio.eyebrow">Trabajo entregado</p>
+      <h2 data-i18n="portfolio.h2">Un proyecto real</h2>
+    </div>
+    <div class="portfolio-card reveal">
+      <div>
+        <span class="role" data-i18n="portfolio.role">Tienda online · Productos desechables</span>
+        <h3 data-i18n="portfolio.title">Una vitrina completa, lista para vender</h3>
+        <p style="color:var(--ink-dim);font-size:14.5px;" data-i18n="portfolio.desc">Construida como página única, rápida de cargar y fácil de usar desde el celular — tanto para el cliente como para quien administra el negocio.</p>
+      </div>
+      <div>
+        <ul class="spec-list">
+          <li data-i18n="pf.b1">Pasarela con Nequi, Daviplata, PSE, Efecty y Bancolombia</li>
+          <li data-i18n="pf.b2">Panel de administración para gestionar cuentas de pago</li>
+          <li data-i18n="pf.b3">Confirmación de envío integrada al flujo de pedidos</li>
+          <li data-i18n="pf.b4">Todo en un solo archivo, sin servidores complicados</li>
+        </ul>
+        <p class="caption" data-i18n="portfolio.caption">Así de completo puede quedar tu proyecto.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== PROCESS ===== -->
+<section id="proceso">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <p class="eyebrow" data-i18n="process.eyebrow">Cómo trabajamos</p>
+      <h2 data-i18n="process.h2">Tres pasos, sin vueltas</h2>
+    </div>
+    <div class="process-grid">
+      <div class="step reveal reveal-d1">
+        <span class="num mono">01</span>
+        <h3 data-i18n="step1.title">Nos escribes</h3>
+        <p data-i18n="step1.desc">Nos cuentas por WhatsApp qué necesitas y para qué tipo de negocio.</p>
+      </div>
+      <div class="step reveal reveal-d2">
+        <span class="num mono">02</span>
+        <h3 data-i18n="step2.title">Lo construimos</h3>
+        <p data-i18n="step2.desc">Diseñamos y armamos tu proyecto, normalmente en pocos días.</p>
+      </div>
+      <div class="step reveal reveal-d3">
+        <span class="num mono">03</span>
+        <h3 data-i18n="step3.title">Lo recibes</h3>
+        <p data-i18n="step3.desc">Te entregamos todo listo para usar, con ajustes incluidos.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="dim-divider"></div>
+
+<!-- ===== PRICING ===== -->
+<section id="precios">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <p class="eyebrow" data-i18n="pricing.eyebrow">Precios</p>
+      <h2 data-i18n="pricing.h2">Sin sorpresas</h2>
+      <p data-i18n="pricing.sub">Selecciona tu país arriba para ver el valor en tu moneda.</p>
+    </div>
+    <div class="price-table reveal">
+      <div class="price-row">
+        <div><div class="price-name" data-i18n="p1.name">Página de presentación</div><div class="price-sub" data-i18n="price.once">Pago único</div></div>
+        <div class="price-right">
+          <span class="price-value" data-cop="Desde $180.000 COP" data-usd="Desde $45 USD"></span>
+          <a class="price-cta wa-cta" data-pkey="p1" target="_blank" rel="noopener noreferrer" data-i18n="price.cta">Cotizar</a>
+        </div>
+      </div>
+      <div class="price-row">
+        <div><div class="price-name" data-i18n="p2.name">Tienda o catálogo online</div><div class="price-sub" data-i18n="price.once">Pago único</div></div>
+        <div class="price-right">
+          <span class="price-value" data-cop="Desde $450.000 COP" data-usd="Desde $115 USD"></span>
+          <a class="price-cta wa-cta" data-pkey="p2" target="_blank" rel="noopener noreferrer" data-i18n="price.cta">Cotizar</a>
+        </div>
+      </div>
+      <div class="price-row">
+        <div><div class="price-name" data-i18n="p3.name">Automatización</div><div class="price-sub" data-i18n="price.once">Pago único</div></div>
+        <div class="price-right">
+          <span class="price-value" data-cop="Desde $350.000 COP" data-usd="Desde $90 USD"></span>
+          <a class="price-cta wa-cta" data-pkey="p3" target="_blank" rel="noopener noreferrer" data-i18n="price.cta">Cotizar</a>
+        </div>
+      </div>
+      <div class="price-row">
+        <div><div class="price-name" data-i18n="p4.name">Mantenimiento mensual</div><div class="price-sub" data-i18n="price.monthly">Pago recurrente</div></div>
+        <div class="price-right">
+          <span class="price-value" data-cop="$80.000 COP /mes" data-usd="$20 USD /mes"></span>
+          <a class="price-cta wa-cta" data-pkey="p4" target="_blank" rel="noopener noreferrer" data-i18n="price.cta">Cotizar</a>
+        </div>
+      </div>
+    </div>
+    <p class="price-hint" data-i18n="pricing.hint">Los precios pueden ajustarse según el alcance del proyecto — esto es un punto de partida.</p>
+  </div>
+</section>
+
+<!-- ===== CONTACT ===== -->
+<section id="contacto">
+  <div class="wrap">
+    <div class="contact-box reveal">
+      <p class="eyebrow" data-i18n="contact.eyebrow">Contacto</p>
+      <h2 data-i18n="contact.h2">Hablemos de tu proyecto</h2>
+      <p data-i18n="contact.sub">Escríbenos por WhatsApp y cuéntanos qué necesitas. Respondemos rápido.</p>
+      <a class="btn btn-primary" id="mainWaBtn" target="_blank" rel="noopener noreferrer" style="font-size:14px;padding:16px 28px;" data-i18n="contact.cta">Escribir por WhatsApp</a>
+      <div class="phone-display">+57 300 412 8428</div>
+      <div class="lang-note" data-i18n="contact.langnote">También trabajamos en inglés — solo dilo.</div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap footer-row">
+    <span data-i18n="footer.tag">ABG — Presencia digital, sin fronteras.</span>
+    <span>© 2026</span>
+  </div>
+</footer>
+
+<!-- ===== ADMIN OVERLAY ===== -->
+<div id="adminOverlay">
+  <div class="admin-header">
+    <h2 class="mono">⚙ ABG ADMIN PANEL</h2>
+    <button class="admin-close" id="adminClose">✕</button>
+  </div>
+
+  <!-- Login -->
+  <div class="admin-login" id="adminLogin">
+    <h3>Acceso restringido</h3>
+    <p>Solo el administrador puede entrar aquí.</p>
+    <input class="admin-input" type="password" id="adminPwInput" placeholder="Contraseña" autocomplete="current-password">
+    <button class="admin-btn" id="adminLoginBtn">Entrar</button>
+    <div class="admin-err" id="adminErr">Contraseña incorrecta.</div>
+  </div>
+
+  <!-- Dashboard -->
+  <div class="admin-dash" id="adminDash">
+    <div class="admin-tabs">
+      <button class="admin-tab active" data-panel="co">🇨🇴 Colombia</button>
+      <button class="admin-tab" data-panel="crypto">₿ Cripto</button>
+      <button class="admin-tab" data-panel="intl">🌐 Internacional</button>
+      <button class="admin-tab" data-panel="general">⚙ General</button>
+    </div>
+
+    <!-- Colombia -->
+    <div class="tab-panel active" id="panel-co">
+      <h4>Métodos de pago — Colombia</h4>
+      <p class="hint">Activa los métodos que aceptas e ingresa el número de cuenta o celular.</p>
+      <div id="rows-co"></div>
+      <div class="save-row"><button class="save-btn" data-save="co">Guardar</button><span class="save-ok" id="ok-co">✓ Guardado</span></div>
+    </div>
+
+    <!-- Crypto -->
+    <div class="tab-panel" id="panel-crypto">
+      <h4>Criptomonedas</h4>
+      <p class="hint">Ingresa la dirección de tu billetera para cada red que aceptes.</p>
+      <div id="rows-crypto"></div>
+      <div class="save-row"><button class="save-btn" data-save="crypto">Guardar</button><span class="save-ok" id="ok-crypto">✓ Guardado</span></div>
+    </div>
+
+    <!-- Internacional -->
+    <div class="tab-panel" id="panel-intl">
+      <h4>Pagos internacionales</h4>
+      <p class="hint">Para clientes fuera de Colombia.</p>
+      <div id="rows-intl"></div>
+      <div class="save-row"><button class="save-btn" data-save="intl">Guardar</button><span class="save-ok" id="ok-intl">✓ Guardado</span></div>
+    </div>
+
+    <!-- General -->
+    <div class="tab-panel" id="panel-general">
+      <h4>Configuración general</h4>
+      <p class="admin-section-label">Número de WhatsApp</p>
+      <input class="admin-input" id="cfg-wa" type="tel" placeholder="Ej: 573004128428 (sin + ni espacios)">
+      <p class="admin-section-label" style="margin-top:20px;">Cambiar contraseña del panel</p>
+      <input class="admin-input" id="cfg-pw-new" type="password" placeholder="Nueva contraseña">
+      <input class="admin-input" id="cfg-pw-confirm" type="password" placeholder="Confirmar contraseña" style="margin-top:8px;">
+      <div class="save-row"><button class="save-btn" id="saveGeneral">Guardar</button><span class="save-ok" id="ok-general">✓ Guardado</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ====================================================
+   TRANSLATIONS
+   ==================================================== */
+const TITLES = {
+  es:{title:'ABG — Construimos tu presencia digital',desc:'Páginas web, tiendas online y automatizaciones para tu negocio.'},
+  en:{title:'ABG — We build your digital presence',desc:'Websites, online stores and automations for your business.'}
+};
+
+const T = {
+  es:{
+    'brand.tag':'studio digital',
+    'nav.services':'Servicios','nav.pagos':'Pagos','nav.portfolio':'Portafolio','nav.pricing':'Precios','nav.contact':'Contacto',
+    'hero.eyebrow':'Desarrollo digital remoto',
+    'hero.h1':'Construimos tu <span class="hl">presencia digital</span>, sin importar dónde estés.',
+    'hero.lede':'Páginas, tiendas y automatizaciones hechas a la medida de tu negocio. Trabajo remoto, entrega rápida, sin tecnicismos.',
+    'hero.cta1':'Cotizar por WhatsApp','hero.cta2':'Ver servicios',
+    'hero.tb1':'PROYECTO: <b>PRESENCIA DIGITAL</b>','hero.tb2':'ALCANCE: <b>GLOBAL</b>','hero.tb3':'ESCALA: <b>A TU MEDIDA</b>',
+    'hero.svg1':'100% RESPONSIVE','hero.svg2':'HECHO A TU MEDIDA',
+    'stats.countries':'Países','stats.mobile':'Mobile-first','stats.days':'Días de entrega','stats.servers':'Servidores complicados',
+    'services.eyebrow':'Qué construimos','services.h2':'Cuatro formas de poner tu negocio en línea','services.sub':'Elige lo que necesitas hoy. Toca cada tarjeta para ver qué incluye.',
+    'common.view':'Ver detalle','common.hide':'Ocultar','common.includes':'Incluye:','common.quote':'Cotizar este servicio',
+    'svc1.title':'Página de presentación','svc1.desc':'Una sola página clara para mostrar lo que haces, con botón directo a WhatsApp. Ideal si recién empiezas.',
+    'svc1.b1':'1 página, diseño a tu medida','svc1.b2':'Botón directo a WhatsApp','svc1.b3':'Optimizada para celular','svc1.b4':'Entrega en archivo único, listo para usar',
+    'svc2.title':'Tienda o catálogo online','svc2.desc':'Vitrina con tus productos, métodos de pago locales y gestión de pedidos. Pensada para vender de verdad.',
+    'svc2.b1':'Catálogo de productos con fotos y precios','svc2.b2':'Métodos de pago locales integrados','svc2.b3':'Panel para gestionar pedidos','svc2.b4':'Confirmación de envío automática',
+    'svc3.title':'Automatizaciones','svc3.desc':'Respuestas automáticas, recordatorios y formularios que trabajan mientras tú atiendes tu negocio.',
+    'svc3.b1':'Respuestas automáticas por WhatsApp','svc3.b2':'Recordatorios programados','svc3.b3':'Formularios que organizan la información sola','svc3.b4':'Se conecta con lo que ya usas',
+    'svc4.title':'Mantenimiento mensual','svc4.desc':'Actualizamos contenido y corregimos detalles para que todo siga funcionando sin que tú toques código.',
+    'svc4.b1':'Cambios de contenido cuando los necesites','svc4.b2':'Corrección de detalles','svc4.b3':'Soporte directo por WhatsApp','svc4.b4':'Revisión mensual de que todo funcione',
+    'pay.eyebrow':'Cómo nos puedes pagar','pay.h2':'Métodos de pago aceptados','pay.sub':'Trabajamos con múltiples opciones según tu país.',
+    'portfolio.eyebrow':'Trabajo entregado','portfolio.h2':'Un proyecto real',
+    'portfolio.role':'Tienda online · Productos desechables','portfolio.title':'Una vitrina completa, lista para vender',
+    'portfolio.desc':'Construida como página única, rápida de cargar y fácil de usar desde el celular.',
+    'pf.b1':'Pasarela con Nequi, Daviplata, PSE, Efecty y Bancolombia','pf.b2':'Panel de administración para gestionar cuentas de pago','pf.b3':'Confirmación de envío integrada al flujo de pedidos','pf.b4':'Todo en un solo archivo, sin servidores complicados',
+    'portfolio.caption':'Así de completo puede quedar tu proyecto.',
+    'process.eyebrow':'Cómo trabajamos','process.h2':'Tres pasos, sin vueltas',
+    'step1.title':'Nos escribes','step1.desc':'Nos cuentas por WhatsApp qué necesitas y para qué tipo de negocio.',
+    'step2.title':'Lo construimos','step2.desc':'Diseñamos y armamos tu proyecto, normalmente en pocos días.',
+    'step3.title':'Lo recibes','step3.desc':'Te entregamos todo listo para usar, con ajustes incluidos.',
+    'pricing.eyebrow':'Precios','pricing.h2':'Sin sorpresas','pricing.sub':'Selecciona tu país arriba para ver el valor en tu moneda.',
+    'p1.name':'Página de presentación','p2.name':'Tienda o catálogo online','p3.name':'Automatización','p4.name':'Mantenimiento mensual',
+    'price.once':'Pago único','price.monthly':'Pago recurrente','price.cta':'Cotizar',
+    'pricing.hint':'Los precios pueden ajustarse según el alcance del proyecto — esto es un punto de partida.',
+    'contact.eyebrow':'Contacto','contact.h2':'Hablemos de tu proyecto',
+    'contact.sub':'Escríbenos por WhatsApp y cuéntanos qué necesitas. Respondemos rápido.',
+    'contact.cta':'Escribir por WhatsApp','contact.langnote':'También trabajamos en inglés — solo dilo.',
+    'footer.tag':'ABG — Presencia digital, sin fronteras.',
+    'wa.generic':'Hola, quiero cotizar un proyecto con ABG.','wa.svc':'Hola, quiero cotizar: {name}','wa.price':'Hola, me interesa: {name}'
+  },
+  en:{
+    'brand.tag':'digital studio',
+    'nav.services':'Services','nav.pagos':'Payments','nav.portfolio':'Portfolio','nav.pricing':'Pricing','nav.contact':'Contact',
+    'hero.eyebrow':'Remote digital development',
+    'hero.h1':'We build your <span class="hl">digital presence</span>, wherever you are.',
+    'hero.lede':"Pages, stores and automations built around your business. Remote work, fast delivery, no tech jargon.",
+    'hero.cta1':'Get a quote on WhatsApp','hero.cta2':'See services',
+    'hero.tb1':'PROJECT: <b>DIGITAL PRESENCE</b>','hero.tb2':'SCOPE: <b>GLOBAL</b>','hero.tb3':'SCALE: <b>CUSTOM</b>',
+    'hero.svg1':'100% RESPONSIVE','hero.svg2':'BUILT TO FIT',
+    'stats.countries':'Countries','stats.mobile':'Mobile-first','stats.days':'Days to deliver','stats.servers':'Complicated servers',
+    'services.eyebrow':'What we build','services.h2':'Four ways to get your business online','services.sub':'Pick what you need today. Tap each card for details.',
+    'common.view':'View details','common.hide':'Hide','common.includes':'Includes:','common.quote':'Get a quote',
+    'svc1.title':'Landing page','svc1.desc':"One clear page showing what you do, with a direct WhatsApp button. Perfect if you're just starting out.",
+    'svc1.b1':'1 page, custom designed','svc1.b2':'Direct WhatsApp button','svc1.b3':'Optimized for mobile','svc1.b4':'Delivered as a single ready-to-use file',
+    'svc2.title':'Online store or catalog','svc2.desc':'A showcase for your products, local payment methods and order management. Built to actually sell.',
+    'svc2.b1':'Product catalog with photos and prices','svc2.b2':'Local payment methods integrated','svc2.b3':'Panel to manage orders','svc2.b4':'Automatic shipping confirmation',
+    'svc3.title':'Automations','svc3.desc':'Automatic replies, reminders and forms that work while you run your business.',
+    'svc3.b1':'Automatic WhatsApp replies','svc3.b2':'Scheduled reminders','svc3.b3':'Forms that organize info by themselves','svc3.b4':'Connects with what you already use',
+    'svc4.title':'Monthly maintenance','svc4.desc':'We update content and fix details so everything keeps working without you touching any code.',
+    'svc4.b1':'Content changes whenever you need','svc4.b2':'Detail fixes','svc4.b3':'Direct WhatsApp support','svc4.b4':'Monthly check that everything works',
+    'pay.eyebrow':'How to pay us','pay.h2':'Accepted payment methods','pay.sub':'We work with multiple options depending on your country.',
+    'portfolio.eyebrow':'Delivered work','portfolio.h2':'A real project',
+    'portfolio.role':'Online store · Disposable products','portfolio.title':'A complete storefront, ready to sell',
+    'portfolio.desc':'Built as a single page, fast to load and easy to use from a phone.',
+    'pf.b1':'Checkout with Nequi, Daviplata, PSE, Efecty and Bancolombia','pf.b2':'Admin panel to manage payment accounts','pf.b3':'Shipping confirmation built into the order flow','pf.b4':'All in a single file, no complicated servers',
+    'portfolio.caption':'This is how complete your project can be.',
+    'process.eyebrow':'How we work','process.h2':'Three steps, no detours',
+    'step1.title':'You message us','step1.desc':"Tell us on WhatsApp what you need and what kind of business it's for.",
+    'step2.title':'We build it','step2.desc':'We design and build your project, usually within a few days.',
+    'step3.title':'You receive it','step3.desc':'We deliver everything ready to use, adjustments included.',
+    'pricing.eyebrow':'Pricing','pricing.h2':'No surprises','pricing.sub':'Select your country above to see the price in your currency.',
+    'p1.name':'Landing page','p2.name':'Online store or catalog','p3.name':'Automation','p4.name':'Monthly maintenance',
+    'price.once':'One-time payment','price.monthly':'Recurring payment','price.cta':'Quote',
+    'pricing.hint':'Prices may vary depending on the real scope of the project — this is a starting point.',
+    'contact.eyebrow':'Contact','contact.h2':"Let's talk about your project",
+    'contact.sub':'Message us on WhatsApp and tell us what you need. We reply fast.',
+    'contact.cta':'Message on WhatsApp','contact.langnote':'We also work in Spanish — just let us know.',
+    'footer.tag':'ABG — Digital presence, without borders.',
+    'wa.generic':"Hi, I'd like to get a quote from ABG.",'wa.svc':"Hi, I'd like a quote for: {name}",'wa.price':"Hi, I'm interested in: {name}"
+  }
+};
+
+/* ====================================================
+   PAYMENT METHODS CONFIG
+   ==================================================== */
+const PAY_DEFS = {
+  co:[
+    {key:'nequi',   icon:'💜', label:'Nequi',       ph:'Número celular Nequi'},
+    {key:'daviplata',icon:'🔵',label:'Daviplata',    ph:'Número celular Daviplata'},
+    {key:'bancolombia',icon:'💛',label:'Bancolombia',ph:'Número de cuenta'},
+    {key:'pse',     icon:'🏦', label:'PSE',          ph:'Banco (ej: Davivienda)'},
+    {key:'efecty',  icon:'💚', label:'Efecty',       ph:'Referencia o instrucciones'},
+  ],
+  crypto:[
+    {key:'usdt_trc20',icon:'🟢',label:'USDT TRC20',   ph:'Dirección de billetera TRC20'},
+    {key:'usdt_erc20',icon:'🔷',label:'USDT ERC20',   ph:'Dirección de billetera ERC20'},
+    {key:'bitcoin',   icon:'🟠',label:'Bitcoin (BTC)', ph:'Dirección de billetera BTC'},
+    {key:'ethereum',  icon:'💎',label:'Ethereum (ETH)',ph:'Dirección de billetera ETH'},
+    {key:'binance_pay',icon:'🌕',label:'Binance Pay',  ph:'ID o dirección Binance Pay'},
+  ],
+  intl:[
+    {key:'paypal',  icon:'🅿️', label:'PayPal',       ph:'Email de PayPal'},
+    {key:'wise',    icon:'🟩', label:'Wise',          ph:'Email o link de Wise'},
+    {key:'zelle',   icon:'🔮', label:'Zelle',         ph:'Email o número Zelle'},
+    {key:'bank',    icon:'🏦', label:'Transferencia bancaria', ph:'Banco · Cuenta · Routing'},
+  ]
+};
+
+const DEFAULT_PAYMENTS = {co:{},crypto:{},intl:{}};
+const DEFAULT_PW = 'ABG2026';
+const DEFAULT_WA = '573004128428';
+
+function loadPayments(){ try{ return JSON.parse(localStorage.getItem('abg_payments')||'{}'); }catch(e){ return {}; } }
+function savePayments(data){ localStorage.setItem('abg_payments',JSON.stringify(data)); }
+function loadCfg(){ try{ return JSON.parse(localStorage.getItem('abg_cfg')||'{}'); }catch(e){ return {}; } }
+function saveCfg(data){ localStorage.setItem('abg_cfg',JSON.stringify(data)); }
+function getWA(){ return loadCfg().wa || DEFAULT_WA; }
+function getPW(){ return loadCfg().pw || DEFAULT_PW; }
+
+/* ====================================================
+   PAYMENT DISPLAY (public page)
+   ==================================================== */
+const PAY_GROUP_LABELS = {co:'🇨🇴 Colombia',crypto:'₿ Cripto',intl:'🌐 Internacional'};
+
+function renderPaymentsPublic(){
+  const data = loadPayments();
+  const container = document.getElementById('paymentsDisplay');
+  if(!container) return;
+  let anyEnabled = false;
+  let html = '';
+  ['co','crypto','intl'].forEach(cat=>{
+    const defs = PAY_DEFS[cat];
+    const catData = data[cat]||{};
+    const enabled = defs.filter(d=>catData[d.key] && catData[d.key].enabled);
+    if(!enabled.length) return;
+    anyEnabled = true;
+    let badges = enabled.map((d,i)=>{
+      const val = catData[d.key].value || '';
+      return `<div class="pay-badge" style="animation-delay:${i*.07}s">
+        <span class="pay-icon">${d.icon}</span>
+        <div class="pay-info">
+          <span class="pay-name">${d.label}</span>
+          ${val ? `<span class="pay-val">${val}</span>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+    html += `<div class="pay-group reveal">
+      <h4>${PAY_GROUP_LABELS[cat]}</h4>
+      <div class="pay-badges">${badges}</div>
+    </div>`;
+  });
+  if(!anyEnabled){
+    html = `<p class="no-payments" data-i18n="pay.none">Consultar métodos de pago directamente por WhatsApp.</p>`;
+  }
+  container.innerHTML = html;
+}
+
+/* ====================================================
+   ADMIN PANEL — BUILD ROWS
+   ==================================================== */
+function buildAdminRows(){
+  const data = loadPayments();
+  ['co','crypto','intl'].forEach(cat=>{
+    const container = document.getElementById(`rows-${cat}`);
+    if(!container) return;
+    const defs = PAY_DEFS[cat];
+    const catData = data[cat]||{};
+    container.innerHTML = defs.map(d=>{
+      const saved = catData[d.key]||{};
+      const checked = saved.enabled ? 'checked' : '';
+      const val = saved.value||'';
+      return `<div class="pay-row">
+        <label class="chk"><input type="checkbox" data-cat="${cat}" data-key="${d.key}" ${checked}><span>${d.icon} ${d.label}</span></label>
+        <input class="admin-input" type="text" data-cat="${cat}" data-val="${d.key}" placeholder="${d.ph}" value="${val}">
+      </div>`;
+    }).join('');
+  });
+  const cfg = loadCfg();
+  const waInput = document.getElementById('cfg-wa');
+  if(waInput) waInput.value = cfg.wa||DEFAULT_WA;
+}
+
+function saveCategory(cat){
+  const data = loadPayments();
+  if(!data[cat]) data[cat]={};
+  document.querySelectorAll(`input[data-cat="${cat}"]`).forEach(el=>{
+    const key = el.dataset.key||el.dataset.val;
+    if(!data[cat][key]) data[cat][key]={};
+    if(el.type==='checkbox') data[cat][key].enabled = el.checked;
+    else data[cat][key].value = el.value.trim();
+  });
+  savePayments(data);
+  const ok = document.getElementById(`ok-${cat}`);
+  if(ok){ ok.style.display='inline'; setTimeout(()=>ok.style.display='none',2000); }
+  renderPaymentsPublic();
+  initReveal();
+}
+
+/* ====================================================
+   ADMIN PANEL — AUTH & UI
+   ==================================================== */
+let logoPresses = 0, logoTimer = null;
+
+document.getElementById('brandLogo').addEventListener('click', ()=>{
+  logoPresses++;
+  clearTimeout(logoTimer);
+  logoTimer = setTimeout(()=>{ logoPresses=0; }, 1800);
+  if(logoPresses >= 5){
+    logoPresses = 0;
+    openAdmin();
+  }
+});
+
+function openAdmin(){
+  const ov = document.getElementById('adminOverlay');
+  ov.classList.add('open');
+  document.getElementById('adminLogin').style.display='block';
+  document.getElementById('adminDash').classList.remove('visible');
+  document.getElementById('adminPwInput').value='';
+  document.getElementById('adminErr').style.display='none';
+}
+
+document.getElementById('adminClose').addEventListener('click', ()=>{
+  document.getElementById('adminOverlay').classList.remove('open');
+});
+
+document.getElementById('adminLoginBtn').addEventListener('click', tryLogin);
+document.getElementById('adminPwInput').addEventListener('keydown', e=>{ if(e.key==='Enter') tryLogin(); });
+
+function tryLogin(){
+  const val = document.getElementById('adminPwInput').value;
+  if(val === getPW()){
+    document.getElementById('adminLogin').style.display='none';
+    document.getElementById('adminDash').classList.add('visible');
+    buildAdminRows();
+    switchTab('co');
+  } else {
+    document.getElementById('adminErr').style.display='block';
+  }
+}
+
+document.querySelectorAll('.admin-tab').forEach(btn=>{
+  btn.addEventListener('click', ()=> switchTab(btn.dataset.panel));
+});
+function switchTab(panel){
+  document.querySelectorAll('.admin-tab').forEach(b=>b.classList.toggle('active', b.dataset.panel===panel));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active', p.id===`panel-${panel}`));
+}
+
+document.querySelectorAll('.save-btn[data-save]').forEach(btn=>{
+  btn.addEventListener('click', ()=> saveCategory(btn.dataset.save));
+});
+
+document.getElementById('saveGeneral').addEventListener('click', ()=>{
+  const cfg = loadCfg();
+  const waVal = document.getElementById('cfg-wa').value.trim();
+  if(waVal) cfg.wa = waVal.replace(/\D/g,'');
+  const newPw = document.getElementById('cfg-pw-new').value;
+  const cfmPw = document.getElementById('cfg-pw-confirm').value;
+  if(newPw && newPw === cfmPw){ cfg.pw = newPw; }
+  saveCfg(cfg);
+  refreshWaLinks();
+  const ok = document.getElementById('ok-general');
+  ok.style.display='inline'; setTimeout(()=>ok.style.display='none',2000);
+  document.getElementById('cfg-pw-new').value='';
+  document.getElementById('cfg-pw-confirm').value='';
+});
+
+/* ====================================================
+   i18n + CURRENCY
+   ==================================================== */
+let currentLang = 'es';
+
+function applyLanguage(lang){
+  currentLang = lang;
+  document.documentElement.lang = lang;
+  document.getElementById('pageTitle').textContent = TITLES[lang].title;
+  document.getElementById('pageDesc').setAttribute('content', TITLES[lang].desc);
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const key = el.dataset.i18n;
+    if(T[lang][key] !== undefined) el.innerHTML = T[lang][key];
+  });
+  refreshCardAffordances();
+  refreshWaLinks();
+}
+
+function applyCurrency(curr){
+  document.querySelectorAll('.price-value').forEach(el=>{
+    el.textContent = curr==='COP' ? el.dataset.cop : el.dataset.usd;
+  });
+}
+
+const countrySelect = document.getElementById('countrySelect');
+countrySelect.addEventListener('change', e=>{
+  const opt = e.target.selectedOptions[0];
+  applyLanguage(opt.dataset.lang);
+  applyCurrency(opt.dataset.currency);
+});
+
+/* ====================================================
+   WHATSAPP LINKS
+   ==================================================== */
+function waLink(txt){ return `https://wa.me/${getWA()}?text=${encodeURIComponent(txt)}`; }
+
+function refreshWaLinks(){
+  const lang = currentLang;
+  document.getElementById('heroWaBtn').href = waLink(T[lang]['wa.generic']);
+  document.getElementById('mainWaBtn').href = waLink(T[lang]['wa.generic']);
+  document.querySelectorAll('.wa-cta[data-svc]').forEach(el=>{
+    const title = T[lang][`${el.dataset.svc}.title`]||'';
+    el.href = waLink(T[lang]['wa.svc'].replace('{name}',title));
+  });
+  document.querySelectorAll('.wa-cta[data-pkey]').forEach(el=>{
+    const name = T[lang][`${el.dataset.pkey}.name`]||'';
+    el.href = waLink(T[lang]['wa.price'].replace('{name}',name));
+  });
+}
+
+/* ====================================================
+   SERVICE CARD ACCORDION
+   ==================================================== */
+function refreshCardAffordances(){
+  document.querySelectorAll('.service-card').forEach(card=>{
+    const open = card.getAttribute('aria-expanded')==='true';
+    const lbl = card.querySelector('.aff-text');
+    if(lbl) lbl.textContent = T[currentLang][open ? 'common.hide' : 'common.view'];
+  });
+}
+
+document.querySelectorAll('.service-card').forEach(card=>{
+  card.addEventListener('click', ()=>{
+    const isOpen = card.getAttribute('aria-expanded')==='true';
+    card.setAttribute('aria-expanded', String(!isOpen));
+    refreshCardAffordances();
+  });
+  card.addEventListener('keydown', e=>{
+    if(e.key==='Enter'||e.key===' '){ e.preventDefault(); card.click(); }
+  });
+});
+document.querySelectorAll('.wa-cta').forEach(el=>{
+  el.addEventListener('click', e=> e.stopPropagation());
+});
+
+/* ====================================================
+   NAV TOGGLE
+   ==================================================== */
+const navToggle = document.getElementById('navToggle');
+const mobileMenu = document.getElementById('mobileMenu');
+navToggle.addEventListener('click', ()=>{
+  const open = mobileMenu.classList.toggle('open');
+  navToggle.setAttribute('aria-expanded', open);
+});
+mobileMenu.querySelectorAll('a').forEach(a=>{
+  a.addEventListener('click', ()=>{ mobileMenu.classList.remove('open'); navToggle.setAttribute('aria-expanded','false'); });
+});
+
+/* ====================================================
+   SCROLL REVEAL
+   ==================================================== */
+function initReveal(){
+  const io = new IntersectionObserver(entries=>{
+    entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('is-visible'); io.unobserve(e.target); } });
+  },{threshold:.12});
+  document.querySelectorAll('.reveal:not(.is-visible)').forEach(el=> io.observe(el));
+}
+
+/* ====================================================
+   BOOT
+   ==================================================== */
+const initOpt = countrySelect.selectedOptions[0];
+applyLanguage(initOpt.dataset.lang);
+applyCurrency(initOpt.dataset.currency);
+renderPaymentsPublic();
+initReveal();
+</script>
+</body>
+</html>
