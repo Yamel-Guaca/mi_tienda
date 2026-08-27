@@ -239,10 +239,10 @@ if ($currentSubcategoryId > 0) {
       <a href="#">Traslado de Mercancía</a>
       <a href="/mi_tienda/admin/listado_productos.php">Listado Pedidos</a>
       <a href="/mi_tienda/admin/dashboard.php">Administrador</a>
-<<<<<<< HEAD
+
       <a href="/mi_tienda/admin/gastos.php">Gastos Local</a>      
-=======
->>>>>>> 1956c45c64ed310ed3aebaa10b6ead872a8da3a5
+
+
     </div>
   </div>
   <div class="header-right">

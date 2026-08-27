@@ -8,9 +8,8 @@ date_default_timezone_set("America/Bogota");
 $servername = "localhost"; // o el host que te muestre Hostinger
 $username   = "root";   // Usuario MySQL
 $password   = "";           // ⚠️ tu contraseña real
-$username   = "u755147454_mitienda";   // Usuario MySQL
-$password   = "N/vPLnBU@A2";           // ⚠️ tu contraseña real
 $database   = "u755147454_mitiendabd"; // Nombre de la base de datos
+
 
 $app_version = "v1.0.0"; // ✅ aquí defines tu versión
 
