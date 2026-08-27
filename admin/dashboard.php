@@ -168,11 +168,10 @@ try {
       <a href="/mi_tienda/admin/invoices_list.php" class="btn">Borrar Factura</a>
       <a href="/mi_tienda/admin/branch_visibility.php" class="btn">Visibilidad de Categorías y Subcategorías por Sucursal</a>
       <a href="/mi_tienda/admin/invoice_template.php">Plantilla Factura</a>
-<<<<<<< HEAD
+
       <a href="/mi_tienda/admin/gastos.php">Gastos</a>
       <a href="/mi_tienda/admin/gastos_list.php">Lista de Gastos</a>
-=======
->>>>>>> 1956c45c64ed310ed3aebaa10b6ead872a8da3a5
+
     </p>
 
   <div class="container">
