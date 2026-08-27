@@ -10,6 +10,7 @@ $username   = "u755147454_mitienda";   // Usuario MySQL
 $password   = "N/vPLnBU@A2";           // ⚠️ tu contraseña real
 $database   = "u755147454_mitiendabd"; // Nombre de la base de datos
 
+
 $app_version = "v1.0.0"; // ✅ aquí defines tu versión
 
 $options = [

@@ -27,62 +27,42 @@ $msg = "";
 $diferencia = null;
 $action = $_POST['action'] ?? null;
 
-<<<<<<< HEAD
+
 // --- Handler ack_report ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'ack_report')) {
     $sessionId = intval($_POST['session_id'] ?? 0);
     if ($sessionId > 0) {
-=======
-// --- Handler mínimo para ack_report (pegar aquí, justo después de obtener $pdo) ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'ack_report')) {
-    $sessionId = intval($_POST['session_id'] ?? 0);
-    if ($sessionId > 0) {
-        // Asegúrate de que las columnas existan en la BD:
-        // ALTER TABLE cash_sessions ADD COLUMN report_acknowledged TINYINT(1) DEFAULT 0;
-        // ALTER TABLE cash_sessions ADD COLUMN report_acknowledged_at DATETIME NULL;
->>>>>>> 1956c45c64ed310ed3aebaa10b6ead872a8da3a5
         try {
-            $stmtAck = $pdo->prepare("UPDATE cash_sessions SET report_acknowledged = 1, report_acknowledged_at = NOW() WHERE id = ?");
+            $stmtAck = $pdo->prepare("
+                UPDATE cash_sessions 
+                SET report_acknowledged = 1, report_acknowledged_at = NOW() 
+                WHERE id = ?
+            ");
             $stmtAck->execute([$sessionId]);
         } catch (Exception $e) {
-<<<<<<< HEAD
-            // log if needed
+            // opcional: loguear error
         }
     }
-=======
-            // No interrumpir la UX si falla; opcionalmente loguear el error en tu sistema de logs.
-        }
-    }
-    // Redirigir para evitar reenvío del formulario y limpiar POST
->>>>>>> 1956c45c64ed310ed3aebaa10b6ead872a8da3a5
+    // Redirigir para evitar reenvío del formulario
     header("Location: caja.php");
     exit;
 }
 // --- fin handler ack_report ---
 
-<<<<<<< HEAD
+
 // --- Handler ack_print_order ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'ack_print_order')) {
     $orderId = intval($_POST['order_id'] ?? 0);
     if ($orderId > 0) {
-=======
-// --- Handler mínimo para ack_print_order (marcar que no se imprimió la factura de la orden) ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'ack_print_order')) {
-    $orderId = intval($_POST['order_id'] ?? 0);
-    if ($orderId > 0) {
-        // Opcional: crea columnas en orders: print_acknowledged TINYINT(1) DEFAULT 0, print_acknowledged_at DATETIME NULL
-        // ALTER TABLE orders ADD COLUMN print_acknowledged TINYINT(1) DEFAULT 0;
-        // ALTER TABLE orders ADD COLUMN print_acknowledged_at DATETIME NULL;
->>>>>>> 1956c45c64ed310ed3aebaa10b6ead872a8da3a5
         try {
-            $stmtAckOrder = $pdo->prepare("UPDATE orders SET print_acknowledged = 1, print_acknowledged_at = NOW() WHERE id = ?");
+            $stmtAckOrder = $pdo->prepare("
+                UPDATE orders 
+                SET print_acknowledged = 1, print_acknowledged_at = NOW() 
+                WHERE id = ?
+            ");
             $stmtAckOrder->execute([$orderId]);
         } catch (Exception $e) {
-<<<<<<< HEAD
-            // log if needed
-=======
-            // No interrumpir la UX si falla; opcionalmente loguear
->>>>>>> 1956c45c64ed310ed3aebaa10b6ead872a8da3a5
+            // opcional: loguear error
         }
     }
     header("Location: caja.php");
@@ -90,12 +70,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'ack_print_order')) {
 }
 // --- fin handler ack_print_order ---
 
-<<<<<<< HEAD
+
 // Detectar si se pasó un lastOrderId
-=======
-// Detectar si se pasó un lastOrderId (mínimo cambio para mostrar botones tras guardar la venta)
-// Esto permite que el flujo que crea la orden redirija a caja.php?last_order_id=123
->>>>>>> 1956c45c64ed310ed3aebaa10b6ead872a8da3a5
 $lastOrderId = intval($_GET['last_order_id'] ?? $_POST['last_order_id'] ?? 0);
 
 // Caja abierta actual del usuario
@@ -108,10 +84,6 @@ $stmt->execute([$currentUserId, $currentBranchId]);
 $currentSession = $stmt->fetch(PDO::FETCH_ASSOC);
 
 // Preparar consulta para ventas por sesión (entre apertura y cierre)
-<<<<<<< HEAD
-=======
-// Usar COALESCE para evitar NULL
->>>>>>> 1956c45c64ed310ed3aebaa10b6ead872a8da3a5
 $stmtVentasSesion = $pdo->prepare("
     SELECT COALESCE(SUM(total),0)
     FROM orders
@@ -121,10 +93,6 @@ $stmtVentasSesion = $pdo->prepare("
 ");
 
 // Preparar consulta para pagos virtuales
-<<<<<<< HEAD
-=======
-// Cambiado: sumar pagos vinculados a órdenes cuya orden fue creada en el rango (evita perder pagos con timestamps distintos)
->>>>>>> 1956c45c64ed310ed3aebaa10b6ead872a8da3a5
 $stmtVirtual = $pdo->prepare("
     SELECT COALESCE(SUM(p.amount),0) 
     FROM payments p
@@ -135,8 +103,7 @@ $stmtVirtual = $pdo->prepare("
       AND o.branch_id = ?
 ");
 
-<<<<<<< HEAD
-// --- NUEVO: gastos por sesión comparando DATETIME (concatenando fecha + hora) ---
+// --- NUEVO: gastos por sesión ---
 $stmtGastos = $pdo->prepare("
     SELECT COALESCE(SUM(valor),0)
     FROM gastos g
@@ -150,14 +117,25 @@ $reportSession = null;
 $reportVentas  = 0;
 $reportVirtualPayments = 0;
 $reportGastos = 0;
-=======
-// Variable para mostrar reporte después de cerrar
+
+
+
+
+
+
+
+
+
+
+
+
+// Variables para mostrar reporte después de cerrar
 $reportSession = null;
 $reportVentas  = 0;
 $reportVirtualPayments = 0;
->>>>>>> 1956c45c64ed310ed3aebaa10b6ead872a8da3a5
+$reportGastos = 0;
 
-// Apertura
+// --- Apertura ---
 if ($action === 'open' && !$currentSession) {
     $opening = floatval(str_replace('.', '', $_POST['opening_amount'] ?? 0));
     if ($opening <= 0) {
@@ -174,20 +152,13 @@ if ($action === 'open' && !$currentSession) {
     }
 }
 
-// Cierre
+// --- Cierre ---
 if ($action === 'close' && $currentSession) {
-<<<<<<< HEAD
-    $closing = floatval(str_replace('.', '', $_POST['closing_amount'] ?? 0));
-    $diferencia = $closing - $currentSession['opening_amount'];
-
-=======
     // Tomar el monto de cierre enviado por el formulario
     $closing = floatval(str_replace('.', '', $_POST['closing_amount'] ?? 0));
-
     $diferencia = $closing - $currentSession['opening_amount'];
 
     // Actualizar la sesión en la base de datos
->>>>>>> 1956c45c64ed310ed3aebaa10b6ead872a8da3a5
     $stmt = $pdo->prepare("
         UPDATE cash_sessions
         SET closing_amount=?, closed_at=NOW(), status='cerrada'
@@ -196,7 +167,12 @@ if ($action === 'close' && $currentSession) {
     $stmt->execute([$closing, $currentSession['id']]);
 
     // Recuperar la sesión actualizada para el reporte
-    $stmt2 = $pdo->prepare("SELECT c.*, u.name AS user_name FROM cash_sessions c JOIN users u ON u.id = c.user_id WHERE c.id = ? LIMIT 1");
+    $stmt2 = $pdo->prepare("
+        SELECT c.*, u.name AS user_name 
+        FROM cash_sessions c 
+        JOIN users u ON u.id = c.user_id 
+        WHERE c.id = ? LIMIT 1
+    ");
     $stmt2->execute([$currentSession['id']]);
     $reportSession = $stmt2->fetch(PDO::FETCH_ASSOC);
 
@@ -204,14 +180,13 @@ if ($action === 'close' && $currentSession) {
     $openedAt = $reportSession['opened_at'];
     $closedAt = $reportSession['closed_at'] ?: date('Y-m-d H:i:s');
     $stmtVentasSesion->execute([$currentBranchId, $openedAt, $closedAt]);
-<<<<<<< HEAD
-    $reportVentas = (float)$stmtVentasSesion->fetchColumn() ?: 0;
+    $reportVentas = (float)$stmtVentasSesion->fetchColumn();
 
     // Calcular pagos virtuales dentro del rango
     $stmtVirtual->execute([$openedAt, $closedAt, $currentBranchId]);
     $reportVirtualPayments = (float)$stmtVirtual->fetchColumn();
 
-    // --- NUEVO: calcular gastos dentro del rango usando DATETIME (fecha + hora) ---
+    // Calcular gastos dentro del rango
     $stmtGastos->execute([$currentBranchId, $openedAt, $closedAt]);
     $reportGastos = (float)$stmtGastos->fetchColumn();
 
@@ -219,53 +194,21 @@ if ($action === 'close' && $currentSession) {
     // No redirigimos para que el cajero vea el reporte
 }
 
-// Re-ejecutar consultas de resumen si no hubo cierre (usar rango de la sesión abierta si existe)
+// --- Re-ejecutar consultas de resumen si no hubo cierre ---
 $defaultOpenedAt = $currentSession['opened_at'] ?? date('Y-m-d H:i:s');
 $defaultClosedAt = $currentSession['closed_at'] ?? date('Y-m-d H:i:s');
 
+// Pagos virtuales
 $stmtVirtual->execute([$defaultOpenedAt, $defaultClosedAt, $currentBranchId]);
 if (empty($reportVirtualPayments)) {
     $reportVirtualPayments = (float)$stmtVirtual->fetchColumn();
 }
 
+// Gastos
 $stmtGastos->execute([$currentBranchId, $defaultOpenedAt, $defaultClosedAt]);
 if (empty($reportGastos)) {
     $reportGastos = (float)$stmtGastos->fetchColumn();
 }
-=======
-    $reportVentas = $stmtVentasSesion->fetchColumn() ?: 0;
-
-    // Calcular ventas virtuales directamente desde la BD (usando o.created_at para incluir pagos vinculados a órdenes del rango)
-    $stmtVirtual->execute([$openedAt, $closedAt, $currentBranchId]);
-    $reportVirtualPayments = (float)$stmtVirtual->fetchColumn();
-
-    // Preparar mensaje y NO redirigir: mostramos el reporte en la misma vista
-    $msg = "Caja cerrada correctamente. Generando reporte de cierre.";
-    // Nota: no hacemos header redirect para que el cajero vea el reporte inmediatamente
-}
-
-// --- NUEVO: sumar pagos virtuales dentro del mismo rango ---
-// (Re-ejecutar stmtVirtual con valores por defecto si no hay cierre; usar openedAt/closedAt si existen)
-$stmtVirtual = $pdo->prepare("
-    SELECT COALESCE(SUM(p.amount),0) 
-    FROM payments p
-    JOIN orders o ON o.id = p.order_id
-    WHERE p.method = 'virtual'
-      AND p.status = 'completado'
-    AND o.created_at BETWEEN ? AND ?
-    AND o.branch_id = ?
-");
-$stmtVirtual->execute([$openedAt ?? date('Y-m-d H:i:s'), $closedAt ?? date('Y-m-d H:i:s'), $currentBranchId]);
-// Solo asignar si no fue ya asignado por el cierre (evitar sobrescribir)
-if (empty($reportVirtualPayments)) {
-    $reportVirtualPayments = (float)$stmtVirtual->fetchColumn();
-} else {
-    // si ya tenemos $reportVirtualPayments (calculado en cierre), no sobrescribir
-}
-
-// Preparar mensaje y NO redirigir: mostramos el reporte en la misma vista
-// Nota: no hacemos header redirect para que el cajero vea el reporte inmediatamente
->>>>>>> 1956c45c64ed310ed3aebaa10b6ead872a8da3a5
 
 // Ventas del día de esa sucursal
 $stmt = $pdo->prepare("
@@ -278,11 +221,7 @@ $stmt = $pdo->prepare("
 $stmt->execute([$currentBranchId]);
 $todaySales = $stmt->fetchColumn() ?: 0;
 
-<<<<<<< HEAD
-// Últimas sesiones de caja: obtener sesiones primero
-=======
 // Últimas sesiones de caja
->>>>>>> 1956c45c64ed310ed3aebaa10b6ead872a8da3a5
 $stmt = $pdo->prepare("
     SELECT c.*, u.name AS user_name
     FROM cash_sessions c
@@ -316,34 +255,45 @@ $sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
     .report .row { display:flex; justify-content:space-between; margin-bottom:6px; }
     .report .bold { font-weight:bold; }
 
+
+
+
+
+
+
+
+
+
+
+
     /* Alternar "sombra" de color (azul/rojo) debajo de cada fila */
-    table tbody tr { position:relative; }
-    table tbody tr::after {
-        content: "";
-        position: absolute;
-        left: 0;
-        right: 0;
-        bottom: -1px;
-        height: 6px;
-        pointer-events: none;
-        border-radius: 0 0 4px 4px;
-    }
-    table tbody tr:nth-child(odd)::after {
-        background: rgba(0, 123, 255, 0.06); /* azul suave */
-    }
-    table tbody tr:nth-child(even)::after {
-        background: rgba(220, 53, 69, 0.06); /* rojo suave */
-    }
+table tbody tr { position:relative; }
+table tbody tr::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 6px;
+    pointer-events: none;
+    border-radius: 0 0 4px 4px;
+}
+table tbody tr:nth-child(odd)::after {
+    background: rgba(0, 123, 255, 0.06); /* azul suave */
+}
+table tbody tr:nth-child(even)::after {
+    background: rgba(220, 53, 69, 0.06); /* rojo suave */
+}
 
-    /* Ocultar columna ID en la vista (no mostrar al usuario) */
-    .id-col { display:none; }
+/* Ocultar columna ID en la vista (no mostrar al usuario) */
+.id-col { display:none; }
 
-    @media (max-width:768px) {
-        header { flex-direction:column; align-items:flex-start; }
-        .table { display:block; overflow-x:auto; white-space:nowrap; }
-        table { min-width:700px; }
-        .report .row { flex-direction:column; align-items:flex-start; }
-    }
+@media (max-width:768px) {
+    header { flex-direction:column; align-items:flex-start; }
+    .table { display:block; overflow-x:auto; white-space:nowrap; }
+    table { min-width:700px; }
+    .report .row { flex-direction:column; align-items:flex-start; }
+}
 </style>
 </head>
 <body>
@@ -351,7 +301,7 @@ $sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <header>
     <h2>Caja / Arqueo</h2>
     <div class="branch">Sucursal actual: <strong><?= htmlspecialchars($currentBranchName) ?></strong></div>
-    <a href="/mi_tienda/admin/pos.php?mode=tactil">Atras</a>
+    <a href="/mi_tienda/admin/pos.php?mode=tactil">Atrás</a>
 </header>
 
 <div class="container">
@@ -360,13 +310,12 @@ $sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="msg"><?= htmlspecialchars($msg) ?></div>
 <?php endif; ?>
 
-<!-- BLOQUE NUEVO: mostrar opciones de impresión tras guardar una venta (mínimo cambio) -->
+<!-- BLOQUE NUEVO: mostrar opciones de impresión tras guardar una venta -->
 <?php if (!empty($lastOrderId)): ?>
     <div class="report" id="report-venta">
         <h4>Venta #<?= htmlspecialchars($lastOrderId) ?> registrada</h4>
         <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
-            <!-- Ajusta la ruta si invoice_print.php está en otra carpeta (ej: admin/invoice_print.php) -->
-            <button onclick="window.open('invoice_print.php?order_id=<?= $lastOrderId ?>','_blank','noopener')">Vista impresión (seleccionar ancho)</button>
+            <button onclick="window.open('invoice_print.php?order_id=<?= $lastOrderId ?>','_blank','noopener')">Vista impresión</button>
             <button onclick="window.open('invoice_print.php?order_id=<?= $lastOrderId ?>&width=58','_blank','noopener')">Imprimir 58mm</button>
             <button onclick="window.open('invoice_print.php?order_id=<?= $lastOrderId ?>&width=80','_blank','noopener')">Imprimir 80mm</button>
 
@@ -383,7 +332,7 @@ $sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <h3>Arqueo de Caja</h3>
 <p>Sucursal actual: <?= htmlspecialchars($currentBranchName) ?></p>
 
-<!-- Denominaciones y inputs (restaurado) -->
+<!-- Denominaciones y inputs -->
 <table class="table">
     <thead>
         <tr>
@@ -421,7 +370,7 @@ function formatMiles(num) {
     return num.toLocaleString('es-CO');
 }
 
-// parseMiles ahora elimina cualquier carácter no numérico (incluye $ y puntos)
+// parseMiles elimina cualquier carácter no numérico
 function parseMiles(str) {
     if (!str) return 0;
     const digits = String(str).replace(/[^\d]/g, '');
@@ -443,20 +392,23 @@ function actualizarArqueo() {
     const totalSpan = document.getElementById("total-caja");
     if (totalSpan) totalSpan.textContent = formatMiles(total);
 
-    // Copiar el total al campo de apertura o cierre con formato (si existen)
+    // Copiar el total al campo de apertura o cierre con formato
     let apertura = document.getElementById("opening_amount");
     let cierre   = document.getElementById("closing_amount");
     if (apertura) apertura.value = formatMiles(total);
     if (cierre) {
         cierre.value = formatMiles(total);
-        // forzar evento input para que se recalculen diferencias
         cierre.dispatchEvent(new Event('input', { bubbles: true }));
     }
-
-    recalcularDiferencia();
 }
 
-// Recalcular diferencia (UI del panel en cierre)
+
+
+
+
+
+
+    // Recalcular diferencia (UI del panel en cierre)
 function recalcularDiferencia() {
     const diffBox = document.getElementById("diff-box");
     if (!diffBox) return;
@@ -486,17 +438,13 @@ function recalcularDiferencia() {
     }
 }
 
-// --- MOVIMOS la asignación de listeners dentro de DOMContentLoaded ---
+// --- Asignación de listeners dentro de DOMContentLoaded ---
 document.addEventListener("DOMContentLoaded", () => {
     // Escuchar cambios y formatear inputs de denominaciones
     document.querySelectorAll(".den-input").forEach(input => {
         input.addEventListener("input", function(e) {
             let raw = (e.target.value || '').replace(/\./g,'');
-            if(raw) {
-                e.target.value = formatMiles(parseInt(raw));
-            } else {
-                e.target.value = "0";
-            }
+            e.target.value = raw ? formatMiles(parseInt(raw)) : "0";
             actualizarArqueo();
         });
     });
@@ -546,7 +494,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <button type="submit">Cerrar caja</button>
     </form>
 
-    <!-- Panel de diferencia/descudre (visible en cierre) -->
+    <!-- Panel de diferencia/descudre -->
     <div id="diff-box" style="margin-top:15px; padding:12px; border:1px solid #ddd; border-radius:8px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
             <strong>Diferencia / Descudre (cierre - apertura)</strong>
@@ -569,78 +517,63 @@ document.addEventListener("DOMContentLoaded", () => {
         <small style="display:block; margin-top:8px; color:#666;">Para descuadre considerando ventas de la sesión, ver columna “Diferencia” en el historial.</small>
     </div>
 
-<?php
-    // Si acabamos de cerrar y tenemos datos para el reporte, mostrarlo aquí
+    <?php
     if ($reportSession):
         $rep = $reportSession;
-        // Diferencia considerando ventas (NO incluir pagos virtuales si ya están en orders.total)
-        // Antes: $repDiff = floatval($rep['closing_amount']) - (floatval($rep['opening_amount']) + floatval($reportVentas));
-        // Ahora: incluir reportVirtualPayments si estos no están incluidos en orders.total
-
-        // --- NUEVO: calcular valor a retirar (dejar la apertura en caja) ---
         $valor_retirar = floatval($rep['closing_amount']) - floatval($rep['opening_amount']);
 
         // Asegurar tipos numéricos
         $reportVentas = (float) $reportVentas;
         $reportVirtualPayments = (float) $reportVirtualPayments;
+        $reportGastos = (float) $reportGastos;
 
-        // Diferencia: incluir pagos virtuales que no estén ya en orders.total
+        // Diferencia: incluir gastos y pagos virtuales
         $repDiff = (float)$rep['closing_amount']
-<<<<<<< HEAD
-                - ( (float)$rep['opening_amount'] + $reportVentas + $reportGastos )
-                + $reportVirtualPayments;
-
-=======
-                   - ( (float)$rep['opening_amount'] + $reportVentas )
-                   + $reportVirtualPayments;
->>>>>>> 1956c45c64ed310ed3aebaa10b6ead872a8da3a5
+                 - ( (float)$rep['opening_amount'] + $reportVentas + $reportGastos )
+                 + $reportVirtualPayments;
     ?>
-    <div class="report" id="report-cierre">
-        <h4>Reporte de Cierre - Caja #<?= htmlspecialchars($rep['id']) ?></h4>
+<div class="report" id="report-cierre">
+    <h4>Reporte de Cierre - Caja #<?= htmlspecialchars($rep['id']) ?></h4>
 
-        <div class="row"><div class="bold">Usuario:</div><div><?= htmlspecialchars($rep['user_name']) ?></div></div>
-        <div class="row"><div class="bold">Sucursal:</div><div><?= htmlspecialchars($currentBranchName) ?></div></div>
-        <div class="row"><div class="bold">Apertura registrada:</div><div>$<?= number_format($rep['opening_amount'],0,",",".") ?> (<?= $rep['opened_at'] ?>)</div></div>
-        <div class="row"><div class="bold">Cierre contado:</div><div>$<?= number_format($rep['closing_amount'],0,",",".") ?> (<?= $rep['closed_at'] ?>)</div></div>
+    <div class="row"><div class="bold">Usuario:</div><div><?= htmlspecialchars($rep['user_name']) ?></div></div>
+    <div class="row"><div class="bold">Sucursal:</div><div><?= htmlspecialchars($currentBranchName) ?></div></div>
+    <div class="row"><div class="bold">Apertura registrada:</div><div>$<?= number_format($rep['opening_amount'],0,",",".") ?> (<?= $rep['opened_at'] ?>)</div></div>
+    <div class="row"><div class="bold">Cierre contado:</div><div>$<?= number_format($rep['closing_amount'],0,",",".") ?> (<?= $rep['closed_at'] ?>)</div></div>
 
-        <!-- Mostrar Valor a retirar -->
-        <div class="row"><div class="bold">Valor a retirar:</div>
-<<<<<<< HEAD
-        <div><?= ($valor_retirar >= 0 ? '' : '-') . '$' . number_format(abs($valor_retirar),0,",",".") ?></div></div>
-
-        <div class="row"><div class="bold">Ventas en la sesión:</div><div>$<?= number_format($reportVentas,0,",",".") ?></div></div>
-        <div class="row"><div class="bold">Ventas virtuales en la sesión:</div><div>$<?= number_format($reportVirtualPayments,0,",",".") ?></div></div>
-        <div class="row"><div class="bold">Gastos en la sesión:</div><div>$<?= number_format($reportGastos,0,",",".") ?></div></div>
-=======
-            <div><?= ($valor_retirar >= 0 ? '' : '-') . '$' . number_format(abs($valor_retirar),0,",",".") ?></div>
-        </div>
-
-        <div class="row"><div class="bold">Ventas en la sesión:</div><div>$<?= number_format($reportVentas,0,",",".") ?></div></div>
-        <div class="row"><div class="bold">Ventas virtuales en la sesión:</div><div>$<?= number_format($reportVirtualPayments,0,",",".") ?></div></div>
->>>>>>> 1956c45c64ed310ed3aebaa10b6ead872a8da3a5
-
-        <div class="row"><div class="bold">Diferencia (cierre - (apertura + ventas)):</div><div><?= ($repDiff >= 0 ? '+' : '-') . '$' . number_format(abs($repDiff),0,",",".") ?></div></div>
-
-        <div style="margin-top:8px;">
-            <strong>Notas:</strong>
-            <ul>
-                <li>El monto de cierre es el valor contado por el cajero al momento de cerrar.</li>
-                <li>La diferencia considera las ventas registradas en el periodo de la sesión.</li>
-            </ul>
-        </div>
-
-        <div style="margin-top:12px; display:flex; gap:8px;">
-            <!-- Botones para abrir la vista de impresión adaptable (invoice_print.php) -->
-            <button onclick="window.open('<?= htmlspecialchars('invoice_print.php?session_id='.$rep['id'].'&width=58') ?>','_blank','noopener')">Imprimir</button>
-
-            <form method="POST" style="margin:0;">
-                <input type="hidden" name="action" value="ack_report">
-                <input type="hidden" name="session_id" value="<?= htmlspecialchars($rep['id']) ?>">
-                
-            </form>
-        </div>
+    <!-- Mostrar Valor a retirar -->
+    <div class="row"><div class="bold">Valor a retirar:</div>
+        <div><?= ($valor_retirar >= 0 ? '' : '-') . '$' . number_format(abs($valor_retirar),0,",",".") ?></div>
     </div>
-    <?php endif; ?>
+
+    <div class="row"><div class="bold">Ventas en la sesión:</div><div>$<?= number_format($reportVentas,0,",",".") ?></div></div>
+    <div class="row"><div class="bold">Ventas virtuales en la sesión:</div><div>$<?= number_format($reportVirtualPayments,0,",",".") ?></div></div>
+    <div class="row"><div class="bold">Gastos en la sesión:</div><div>$<?= number_format($reportGastos,0,",",".") ?></div></div>
+
+    <div class="row"><div class="bold">Diferencia (cierre - (apertura + ventas + gastos) + virtuales):</div>
+        <div><?= ($repDiff >= 0 ? '+' : '-') . '$' . number_format(abs($repDiff),0,",",".") ?></div>
+    </div>
+
+    <div style="margin-top:8px;">
+        <strong>Notas:</strong>
+        <ul>
+            <li>El monto de cierre es el valor contado por el cajero al momento de cerrar.</li>
+            <li>La diferencia considera las ventas y gastos registrados en el periodo de la sesión.</li>
+            <li>Los pagos virtuales se suman aparte si no están incluidos en las ventas.</li>
+        </ul>
+    </div>
+
+    <div style="margin-top:12px; display:flex; gap:8px;">
+        <!-- Botón para imprimir -->
+        <button onclick="window.open('<?= htmlspecialchars('invoice_print.php?session_id='.$rep['id'].'&width=58') ?>','_blank','noopener')">Imprimir</button>
+
+        <form method="POST" style="margin:0;">
+            <input type="hidden" name="action" value="ack_report">
+            <input type="hidden" name="session_id" value="<?= htmlspecialchars($rep['id']) ?>">
+            <button type="submit">Confirmar reporte</button>
+        </form>
+    </div>
+</div>
+<?php endif; ?>
 
 <?php else: ?>
     <p>No tienes una caja abierta actualmente.</p>
@@ -668,11 +601,8 @@ if ($currentUserRole == 1):
                 <th>Estado</th>
                 <th>Abierta</th>
                 <th>Cerrada</th>
-<<<<<<< HEAD
                 <th>Ventas</th>
                 <th>Gastos</th>
-=======
->>>>>>> 1956c45c64ed310ed3aebaa10b6ead872a8da3a5
                 <th>Diferencia</th>
                 <th>Valor a Retirar</th>
             </tr>
@@ -682,7 +612,6 @@ if ($currentUserRole == 1):
             <?php
                 $openedAt = $s['opened_at'];
                 $closedAt = $s['closed_at'] ?: date('Y-m-d H:i:s');
-<<<<<<< HEAD
 
                 // Ventas en la sesión
                 $stmtVentasSesion->execute([$currentBranchId, $openedAt, $closedAt]);
@@ -692,7 +621,7 @@ if ($currentUserRole == 1):
                 $stmtVirtual->execute([$openedAt, $closedAt, $currentBranchId]);
                 $virtualSesion = (float)$stmtVirtual->fetchColumn();
 
-                // 👉 NUEVO: Gastos en la sesión
+                // Gastos en la sesión
                 $stmtGastos->execute([$currentBranchId, $openedAt, $closedAt]);
                 $gastosSesion = (float)$stmtGastos->fetchColumn();
 
@@ -700,19 +629,6 @@ if ($currentUserRole == 1):
                 $diff = null;
                 if ($s['closing_amount'] !== null) {
                     $diff = $s['closing_amount'] - ($s['opening_amount'] + $ventasSesion + $gastosSesion);
-=======
-                $stmtVentasSesion->execute([$currentBranchId, $openedAt, $closedAt]);
-                $ventasSesion = $stmtVentasSesion->fetchColumn() ?: 0;
-
-                // Sumar pagos virtuales para esa sesión (solo para mostrar, no para restar)
-                $stmtVirtual->execute([$openedAt, $closedAt, $currentBranchId]);
-                $virtualSesion = (float)$stmtVirtual->fetchColumn();
-
-                $diff = null;
-                if ($s['closing_amount'] !== null) {
-                    // NO incluir virtualSesion en la resta si ya está incluida en ventasSesion
-                    $diff = $s['closing_amount'] - ($s['opening_amount'] + $ventasSesion);
->>>>>>> 1956c45c64ed310ed3aebaa10b6ead872a8da3a5
                 }
                 $diffTexto = ($diff === null) ? '-' : (($diff >= 0 ? '+' : '-') . '$' . number_format(abs($diff), 0, ",", "."));
 
@@ -731,11 +647,8 @@ if ($currentUserRole == 1):
                 <td><?= htmlspecialchars($s['status']) ?></td>
                 <td><?= $s['opened_at'] ?></td>
                 <td><?= $s['closed_at'] ?: '-' ?></td>
-<<<<<<< HEAD
                 <td><?= '$' . number_format($ventasSesion, 0, ",", ".") ?></td>
                 <td><?= '$' . number_format($gastosSesion, 0, ",", ".") ?></td>
-=======
->>>>>>> 1956c45c64ed310ed3aebaa10b6ead872a8da3a5
                 <td><?= $diffTexto ?></td>
                 <td><?= $withdrawTexto ?></td>
             </tr>
@@ -745,7 +658,6 @@ if ($currentUserRole == 1):
 <?php
 endif; // fin condicional de rol
 ?>
-
 </div>
 </body>
 </html>
