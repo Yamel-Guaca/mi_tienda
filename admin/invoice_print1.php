@@ -1,5 +1,6 @@
 <?php
 // admin/invoice_print.php
+// Versión corregida: todo HTML se arma en $html para evitar errores de sintaxis
 // ... (comentarios iniciales) ...
 
 ini_set('display_errors', 1);
@@ -65,11 +66,14 @@ try {
             case 'company_phone': $company['phone'] = $r['value']; break;
         }
     }
-} catch (Exception $e) {}
+} catch (Exception $e) {
+    // ignore
+}
 
 // Parámetros
 $sessionId  = isset($_GET['session_id']) ? intval($_GET['session_id']) : 0;
 $orderId    = isset($_GET['order_id']) ? intval($_GET['order_id']) : 0;
+$gastoId    = isset($_GET['gasto_id']) ? intval($_GET['gasto_id']) : 0;
 
 $cart = [];
 // Nota: Al estar sincronizado PHP y MySQL, date() y $orderRow['created_at'] coincidirán.
@@ -81,13 +85,14 @@ $invoiceData = [
 ];
 
 $branchIdForQr = null;
+$taxRate = 0.0;
 
 /* ===========================================================
    BLOQUE ADICIONAL: Soporte para imprimir Reporte de Cierre
    Cuando se pasa session_id en la query string
    =========================================================== */
-$closureId = isset($_GET['session_id']) ? intval($_GET['session_id']) : 0;
-if ($closureId > 0) {
+$closureId = $sessionId;
+if ($closureId > 0 && $orderId === 0 && $gastoId === 0) {
     // Cargar datos del cierre (ajusta nombres si tu esquema difiere)
     $stmt = $pdo->prepare("
       SELECT c.*, u.name AS user_name, b.name AS branch_name
@@ -99,15 +104,11 @@ if ($closureId > 0) {
     ");
     $stmt->execute([$closureId]);
     $c = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$c) {
-        echo "Cierre no encontrado.";
-        exit;
-    }
+    if (!$c) { echo "Cierre no encontrado."; exit; }
 
     // Seguridad: permitir solo imprimir cierres de la misma sucursal (salvo admin)
     if (($c['branch_id'] ?? null) != ($_SESSION['branch_id'] ?? null) && ($_SESSION['user']['role_id'] ?? 0) != 1) {
-        echo "Acceso denegado.";
-        exit;
+        echo "Acceso denegado."; exit;
     }
 
     // Fechas de apertura y cierre (usar las claves que usas en caja.php)
@@ -124,7 +125,6 @@ if ($closureId > 0) {
 
     // Ventas virtuales (pagos virtuales) en el mismo rango
     // Ajuste: sumar pagos vinculados a órdenes cuya orden fue creada en el rango
-    // Esto evita perder pagos cuyo payments.created_at difiera del created_at de la orden
     $stmt = $pdo->prepare("
       SELECT COALESCE(SUM(p.amount),0) FROM payments p
       INNER JOIN orders o ON o.id = p.order_id
@@ -133,24 +133,271 @@ if ($closureId > 0) {
     $stmt->execute([$c['branch_id'], $opening_at, $closing_at]);
     $sales_virtual = floatval($stmt->fetchColumn());
 
-    // Diferencia: cierre - (apertura + ventas)  + ventas_virtual (si corresponde)
+    // 👉 NUEVO: Gastos en la sesión (comparando por DATETIME)
+    $stmt = $pdo->prepare("
+      SELECT COALESCE(SUM(valor),0) 
+      FROM gastos g
+      WHERE g.branch_id = ? 
+        AND CONCAT(g.fecha,' ',g.hora) BETWEEN ? AND ?
+        AND g.anulado = 0
+    ");
+    $stmt->execute([$c['branch_id'], $opening_at, $closing_at]);
+    $sales_gastos = floatval($stmt->fetchColumn());
+
     $opening_amount = floatval($c['opening_amount'] ?? 0);
     $closing_amount = floatval($c['closing_amount'] ?? 0);
 
-    // CORRECCIÓN: incluir ventas virtuales que no estén ya incluidas en orders.total
-    // Si en tu modelo orders.total ya incluye pagos virtuales, quita la suma de $sales_virtual.
-    $difference = $closing_amount - ($opening_amount + $sales_total) + $sales_virtual;
-
-    // --- NUEVO: valor a retirar (dejar la apertura en caja) ---
+    // Ajustar diferencia incluyendo gastos
+    $difference = $closing_amount - ($opening_amount + $sales_total + $sales_gastos) + $sales_virtual;
     $withdraw_amount = $closing_amount - $opening_amount;
 
-    // Ancho de impresión
     $width = (isset($_GET['width']) && intval($_GET['width']) === 80) ? '80mm' : '58mm';
-
-    // Preparar displays
-    $fmt = function($v){ return '$' . number_format(floatval($v), 0, ",", "."); }; // sin decimales; cambia a 2 si quieres
+    $fmt = function($v){ return '$' . number_format(floatval($v), 0, ",", "."); };
     $opening_display = htmlspecialchars($opening_at);
     $closing_display = htmlspecialchars($closing_at);
+
+    // Construir HTML del cierre
+    $html = '<!doctype html><html><head><meta charset="utf-8"><title>Reporte de Cierre</title>';
+    $html .= '<meta name="viewport" content="width=device-width,initial-scale=1">';
+    $html .= '<style>:root{--pad:8px;--mono:"Courier New",Courier,monospace}html,body{margin:0;padding:0;background:#fff;color:#000;font-family:var(--mono);font-size:12px;font-weight:700}.ticket{width:100%;max-width:320px;padding:var(--pad);box-sizing:border-box}.title{font-weight:900;text-align:center;font-size:14px;margin-bottom:6px}.subtitle{font-weight:800;font-size:12px;text-align:center;margin-bottom:6px}.sep{border-top:1px dashed #000;margin:8px 0}.row{display:flex;justify-content:space-between;align-items:flex-start;margin:4px 0;line-height:1.25}.label{flex:1;font-size:12px}.value{flex:1;text-align:right;font-weight:900}@media print{body{width:'.$width.'}.no-print{display:none}}</style>';
+    $html .= '</head><body><div class="ticket">';
+    $html .= '<div class="title">Reporte de Cierre</div>';
+    $html .= '<div class="subtitle">Caja #'.htmlspecialchars($c['id']).'</div>';
+    $html .= '<div class="row"><div class="label">Usuario</div><div class="value">'.htmlspecialchars($c['user_name']).'</div></div>';
+    $html .= '<div class="row"><div class="label">Sucursal</div><div class="value">'.htmlspecialchars($c['branch_name']).'</div></div>';
+    $html .= '<div class="sep"></div>';
+    $html .= '<div class="row"><div class="label">Apertura registrada</div><div class="value">'.$fmt($opening_amount).'</div></div>';
+    $html .= '<div style="font-size:11px;margin-top:6px;font-weight:900">'.$opening_display.'</div>';
+    $html .= '<div class="row"><div class="label">Cierre contado</div><div class="value">'.$fmt($closing_amount).'</div></div>';
+    $html .= '<div style="font-size:11px;margin-top:6px;font-weight:900">'.$closing_display.'</div>';
+    $html .= '<div class="sep"></div>';
+    $html .= '<div class="row"><div class="label">Valor a retirar</div><div class="value">'.$fmt($withdraw_amount).'</div></div>';
+    $html .= '<div class="row"><div class="label">Ventas en la sesión</div><div class="value">'.$fmt($sales_total).'</div></div>';
+    $html .= '<div class="row"><div class="label">Ventas virtuales en la sesión</div><div class="value">'.$fmt($sales_virtual).'</div></div>';
+    $html .= '<div class="row"><div class="label">Gastos en la sesión</div><div class="value">'.$fmt($sales_gastos).'</div></div>';
+    $html .= '<div class="sep"></div>';
+    $html .= '<div class="row"><div class="label">Diferencia (cierre - (apertura + ventas + gastos))</div><div class="value">'.(($difference>=0?'+':'-').$fmt(abs($difference))).'</div></div>';
+    $html .= '<div style="text-align:center;margin-top:10px;font-weight:700">Gracias</div>';
+    $html .= '<div class="no-print" style="text-align:center;margin-top:10px"><button onclick="window.print()" style="padding:8px 12px;border-radius:6px;background:#0078d4;color:#fff;border:0;cursor:pointer">Imprimir</button> <button onclick="window.close()" style="padding:8px 12px;border-radius:6px;">Cerrar</button></div>';
+    $html .= '</div></body></html>';
+
+    echo $html;
+    exit;
+}
+
+/* ---------------------------
+   BLOQUE: Impresión de Gasto
+   --------------------------- */
+if ($gastoId > 0 && $orderId === 0 && $closureId === 0) {
+    // SELECT con fallback a la sucursal del usuario
+    $stmt = $pdo->prepare("
+        SELECT g.*,
+               u.name AS usuario_nombre,
+               COALESCE(b.name, ub.name, '') AS branch_name,
+               COALESCE(b.nit, ub.nit, '') AS branch_nit,
+               COALESCE(b.address, ub.address, '') AS branch_address,
+               COALESCE(b.phone, ub.phone, '') AS branch_phone,
+               COALESCE(b.invoice_legend, ub.invoice_legend, '') AS invoice_legend,
+               COALESCE(b.company_logo, ub.company_logo, '') AS company_logo,
+               COALESCE(g.branch_id, u.branch_id) AS resolved_branch_id
+        FROM gastos g
+        LEFT JOIN users u ON u.id = g.usuario_id
+        LEFT JOIN branches b ON b.id = g.branch_id
+        LEFT JOIN branches ub ON ub.id = u.branch_id
+        WHERE g.id = ? LIMIT 1
+    ");
+    $stmt->execute([$gastoId]);
+    $g = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$g) { echo "Gasto no encontrado."; exit; }
+
+    // Seguridad por sucursal (usar resolved_branch_id)
+    $resolvedBranchId = $g['resolved_branch_id'] ?? null;
+    if (($resolvedBranchId ?? null) != ($_SESSION['branch_id'] ?? null) && ($_SESSION['user']['role_id'] ?? 0) != 1) {
+        echo "Acceso denegado."; exit;
+    }
+
+    // Preparar datos
+    $invoiceData['number'] = 'G' . $g['id'];
+    $invoiceData['date']   = trim(($g['fecha'] ?? '') . ' ' . ($g['hora'] ?? ''));
+    $invoiceData['cashier'] = $g['usuario_nombre'] ?? ($_SESSION['user']['name'] ?? 'Cajero');
+    $invoiceData['customer'] = $g['referencia'] ?? '';
+    $branchIdForQr = $resolvedBranchId;
+
+    // Si hay branchIdForQr, recargar datos de branch para consistencia
+    if ($branchIdForQr) {
+        try {
+            $stmtBranch = $pdo->prepare("SELECT * FROM branches WHERE id = ?");
+            $stmtBranch->execute([$branchIdForQr]);
+            $branch = $stmtBranch->fetch(PDO::FETCH_ASSOC);
+            if ($branch) {
+                $company = [
+                    'name'    => $branch['name'] ?? $company['name'],
+                    'nit'     => $branch['nit'] ?? $company['nit'],
+                    'address' => $branch['address'] ?? $company['address'],
+                    'phone'   => $branch['phone'] ?? $company['phone'],
+                    'legend'  => $branch['invoice_legend'] ?? $company['legend'],
+                    'logo'    => $branch['company_logo'] ?? $company['logo']
+                ];
+                $g['branch_name'] = $branch['name'] ?? ($g['branch_name'] ?? $company['name']);
+                $g['branch_nit'] = $branch['nit'] ?? ($g['branch_nit'] ?? $company['nit']);
+                $g['branch_address'] = $branch['address'] ?? ($g['branch_address'] ?? $company['address']);
+                $g['branch_phone'] = $branch['phone'] ?? ($g['branch_phone'] ?? $company['phone']);
+                $g['company_logo'] = $branch['company_logo'] ?? ($g['company_logo'] ?? $company['logo']);
+                $g['invoice_legend'] = $branch['invoice_legend'] ?? ($g['invoice_legend'] ?? $company['legend']);
+            }
+        } catch (Exception $e) {
+            // ignore
+        }
+    }
+
+    // Construir HTML del gasto (ancho 58mm)
+    $width = '58mm';
+    $fmtMoney = function($v){ return '$' . number_format(floatval($v), 0, ",", "."); };
+
+    $branchDisplayName = trim($g['branch_name'] ?? '') ?: $company['name'];
+    $branchDisplayNit  = trim($g['branch_nit'] ?? '') ?: $company['nit'];
+    $branchDisplayAddr = trim($g['branch_address'] ?? '') ?: $company['address'];
+    $branchDisplayPhone= trim($g['branch_phone'] ?? '') ?: $company['phone'];
+
+    $html = '<!doctype html><html><head><meta charset="utf-8"><title>Gasto #'.htmlspecialchars($g['id']).'</title>';
+    $html .= '<meta name="viewport" content="width=device-width,initial-scale=1">';
+    $html .= '<style>:root{--pad:6px;--mono:\'Courier New\',Courier,monospace}html,body{margin:0;padding:0;background:#fff;color:#000;font-family:var(--mono);font-weight:700}.ticket{max-width:320px;padding:var(--pad);box-sizing:border-box}.center{text-align:center;font-weight:800;color:#000}.small{font-size:11px;font-weight:900;color:#000}.sep{border-top:1px dashed #000;margin:6px 0}.no-print{display:block}@media print{body{width:'.$width.'}.no-print{display:none}}img.logo{max-width:160px;max-height:60px;margin-bottom:6px}</style>';
+    $html .= '</head><body><div class="ticket">';
+
+    if (!empty($g['company_logo'])) {
+        $logoEsc = htmlspecialchars($g['company_logo']);
+        $html .= '<div class="center"><img src="'.$logoEsc.'" alt="Logo" class="logo"></div>';
+    } elseif (!empty($company['logo'])) {
+        $logoEsc = htmlspecialchars($company['logo']);
+        $html .= '<div class="center"><img src="'.$logoEsc.'" alt="Logo" class="logo"></div>';
+    }
+
+    $html .= '<div class="center" style="font-weight:bold;font-size:14px;color:#000;">'.htmlspecialchars($branchDisplayName).'</div>';
+    $html .= '<div class="center small" style="color:#000;">NIT: '.htmlspecialchars($branchDisplayNit).'</div>';
+    $html .= '<div class="center small" style="color:#000;">'.htmlspecialchars($branchDisplayAddr).'</div>';
+    if (!empty($branchDisplayPhone)) $html .= '<div class="center small" style="color:#000;">Tel: '.htmlspecialchars($branchDisplayPhone).'</div>';
+
+    $qrContent = "Gasto:".($invoiceData['number'] ?? '')." | Fecha:".($invoiceData['date'] ?? '');
+    if ($branchIdForQr) $qrContent .= " | Sucursal:{$branchIdForQr}";
+    $qrUrl = "https://chart.googleapis.com/chart?chs=150x150&cht=qr&chl=" . rawurlencode($qrContent) . "&choe=UTF-8";
+    $html .= '<div class="center" style="margin-top:6px;"><img src="'.$qrUrl.'" alt="QR" style="width:70px;height:70px;"></div>';
+
+    $html .= '<div class="sep"></div>';
+    $html .= '<div class="small">Gasto ID: <strong>'.htmlspecialchars($g['id']).'</strong></div>';
+    $html .= '<div class="small">Fecha: <strong style="color:#000;">'.htmlspecialchars($invoiceData['date']).'</strong></div>';
+    $html .= '<div class="small">Usuario: <strong style="color:#000;">'.htmlspecialchars($invoiceData['cashier']).'</strong></div>';
+    $html .= '<div class="small">Sucursal: <strong style="color:#000;">'.htmlspecialchars($branchDisplayName).'</strong></div>';
+    $html .= '<div class="sep"></div>';
+    $html .= '<div class="small">Descripción:</div>';
+    $html .= '<div class="small" style="margin-bottom:6px;">'.nl2br(htmlspecialchars($g['descripcion'] ?? '')).'</div>';
+    $html .= '<div class="small">Referencia: <strong>'.htmlspecialchars($g['referencia'] ?? '-').'</strong></div>';
+    $html .= '<div class="small">Valor: <strong>'.$fmtMoney($g['valor']).'</strong></div>';
+    $html .= '<div class="sep"></div>';
+    $html .= '<div class="small" style="color:#000;">'.htmlspecialchars($g['invoice_legend'] ?? $company['legend']).'</div>';
+    $html .= '<div style="height:20px;"></div>';
+    $html .= '<div class="no-print" style="margin-top:10px;text-align:center;"><button onclick="window.print()" style="padding:10px 14px;border-radius:6px;">Imprimir</button> <button onclick="window.close()" style="padding:8px 12px;border-radius:6px;">Cerrar</button></div>';
+    $html .= '</div></body></html>';
+
+    // Guardar copia HTML si la columna existe
+    try {
+        $cols = $pdo->query("SHOW COLUMNS FROM gastos LIKE 'printed_invoice_html'")->fetchAll();
+        if (!empty($cols)) {
+            $stmtSave = $pdo->prepare("UPDATE gastos SET printed_invoice_html = ?, printed_at = NOW() WHERE id = ?");
+            $stmtSave->execute([$html, $gastoId]);
+        }
+    } catch (Exception $e) {
+        // ignore
+    }
+
+    echo $html;
+    exit;
+}
+
+/* ---------------------------
+   /* ---------------------------
+   BLOQUE: Impresión de Orden (order_id)
+   --------------------------- */
+if ($orderId > 0 && $gastoId === 0 && $closureId === 0) {
+    try {
+        // Diferencia: cierre - (apertura + ventas)  + ventas_virtual (si corresponde)
+        $opening_amount = floatval($c['opening_amount'] ?? 0);
+        $closing_amount = floatval($c['closing_amount'] ?? 0);
+
+        // CORRECCIÓN: incluir ventas virtuales que no estén ya incluidas en orders.total
+        // Si en tu modelo orders.total ya incluye pagos virtuales, quita la suma de $sales_virtual.
+        $difference = $closing_amount - ($opening_amount + $sales_total) + $sales_virtual;
+
+        // --- NUEVO: valor a retirar (dejar la apertura en caja) ---
+        $withdraw_amount = $closing_amount - $opening_amount;
+
+        // Ancho de impresión
+        $width = (isset($_GET['width']) && intval($_GET['width']) === 80) ? '80mm' : '58mm';
+
+        // Preparar displays
+        $fmt = function($v){ return '$' . number_format(floatval($v), 0, ",", "."); }; // sin decimales; cambia a 2 si quieres
+        $opening_display = htmlspecialchars($opening_at);
+        $closing_display = htmlspecialchars($closing_at);
+
+        // Aquí continúa la lógica de impresión de la orden:
+        // Cargar datos de la orden, items, pagos, etc.
+        $stmtO = $pdo->prepare("SELECT id, total, created_at, COALESCE(customer_name,'') AS customer_name, branch_id, user_id FROM orders WHERE id = ? LIMIT 1");
+        $stmtO->execute([$orderId]);
+        $orderRow = $stmtO->fetch(PDO::FETCH_ASSOC);
+
+        if ($orderRow) {
+            $invoiceData['number']  = 'O' . $orderRow['id'];
+            $invoiceData['date']    = $orderRow['created_at'];
+            $invoiceData['customer']= $orderRow['customer_name'] ?: $invoiceData['customer'];
+            $branchIdForQr = $orderRow['branch_id'] ?? null;
+
+            // --- Carga de items ---
+            $items = [];
+            try {
+                $stmtItems = $pdo->prepare("
+                    SELECT 
+                        oi.id,
+                        oi.order_id,
+                        oi.product_id,
+                        oi.quantity AS qty,
+                        oi.price AS unit_price,
+                        oi.subtotal AS line_total,
+                        COALESCE(oi.product_name, p.name, CONCAT('Producto ', oi.product_id)) AS product_name
+                    FROM order_items oi
+                    LEFT JOIN products p ON oi.product_id = p.id
+                    WHERE oi.order_id = ?
+                ");
+                $stmtItems->execute([$orderId]);
+                $items = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
+            } catch (Exception $e) {
+                $items = [];
+            }
+
+            if (empty($items)) {
+                $items[] = [
+                    'product_name' => "Venta #{$orderRow['id']}",
+                    'qty' => 1,
+                    'unit_price' => floatval($orderRow['total']),
+                    'line_total' => floatval($orderRow['total']),
+                    'product_id' => 0
+                ];
+            }
+
+            foreach ($items as $it) {
+                $cart[] = [
+                    'qty' => intval($it['qty'] ?? 1),
+                    'code' => isset($it['product_id']) ? (string)$it['product_id'] : '',
+                    'name' => $it['product_name'] ?? 'Producto',
+                    'unit_price' => floatval($it['unit_price'] ?? ($it['line_total'] ?? 0))
+                ];
+            }
+        }
+    } catch (Exception $e) {
+        // Manejo de error al cargar la orden
+        $orderRow = false;
+    }
+}
+
+    
     ?>
     <!doctype html>
     <html>
@@ -260,7 +507,7 @@ if ($closureId > 0) {
     </html>
     <?php
     exit;
-}
+
 /* ===========================================================
    FIN BLOQUE ADICIONAL: Reporte de Cierre
    =========================================================== */
@@ -324,27 +571,28 @@ if ($orderId > 0) {
             ];
         }
     }
-}
 
-// --- Ajuste: cargar datos de la sucursal desde branches si existe branchIdForQr ---
-$taxRate = 0.0;
-if ($branchIdForQr) {
-    try {
-        $stmtBranch = $pdo->prepare("SELECT * FROM branches WHERE id = ?");
-        $stmtBranch->execute([$branchIdForQr]);
-        $branch = $stmtBranch->fetch(PDO::FETCH_ASSOC);
-        if ($branch) {
-            $company = [
-                'name'    => $branch['name'] ?? '',
-                'nit'     => $branch['nit'] ?? '',
-                'address' => $branch['address'] ?? '',
-                'phone'   => $branch['phone'] ?? '',
-                'legend'  => $branch['invoice_legend'] ?? '',
-                'logo'    => $branch['company_logo'] ?? ''
-            ];
-            $taxRate = isset($branch['tax_rate']) ? floatval($branch['tax_rate']) : 0.0;
+    // Cargar datos de branch si aplica
+    if ($branchIdForQr) {
+        try {
+            $stmtBranch = $pdo->prepare("SELECT * FROM branches WHERE id = ?");
+            $stmtBranch->execute([$branchIdForQr]);
+            $branch = $stmtBranch->fetch(PDO::FETCH_ASSOC);
+            if ($branch) {
+                $company = [
+                    'name'    => $branch['name'] ?? $company['name'],
+                    'nit'     => $branch['nit'] ?? $company['nit'],
+                    'address' => $branch['address'] ?? $company['address'],
+                    'phone'   => $branch['phone'] ?? $company['phone'],
+                    'legend'  => $branch['invoice_legend'] ?? $company['legend'],
+                    'logo'    => $branch['company_logo'] ?? $company['logo']
+                ];
+                $taxRate = isset($branch['tax_rate']) ? floatval($branch['tax_rate']) : 0.0;
+            }
+        } catch (Exception $e) {
+            // ignore
         }
-    } catch (Exception $e) {}
+    }
 }
 
 // --- Items y totales ---
@@ -384,7 +632,9 @@ if ($orderId > 0) {
                 $virtualReceived = floatval($r['amount'] ?? 0);
             }
         }
-    } catch (Exception $e) {}
+    } catch (Exception $e) {
+        // ignore
+    }
 }
 
 // --- QR ---
