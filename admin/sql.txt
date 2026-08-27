@@ -1,0 +1,33 @@
+DROP TABLE IF EXISTS gastos;
+
+CREATE TABLE gastos (
+  id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  usuario_id INT NOT NULL,
+  rol_id INT NOT NULL,
+  fecha DATE NOT NULL,
+  hora TIME NOT NULL,
+  valor DECIMAL(12,2) NOT NULL,
+  descripcion VARCHAR(255) NOT NULL,
+  referencia VARCHAR(100) DEFAULT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  anulado TINYINT(1) NOT NULL DEFAULT 0,
+  anulado_by INT DEFAULT NULL,
+  anulado_at DATETIME DEFAULT NULL,
+  INDEX (fecha),
+  INDEX (usuario_id),
+  INDEX (rol_id),
+  INDEX (anulado),
+  CONSTRAINT fk_gastos_usuario FOREIGN KEY (usuario_id) REFERENCES users(id),
+  CONSTRAINT fk_gastos_rol FOREIGN KEY (rol_id) REFERENCES roles(id),
+  CONSTRAINT fk_gastos_anulado_by FOREIGN KEY (anulado_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+Opción A — Recomendado: agregar branch_id a gastos (persistente y correcto)
+1) Crear la columna en la base de datos
+
+Ejecuta en tu gestor MySQL (phpMyAdmin o consola):
+
+ALTER TABLE gastos
+ADD COLUMN branch_id INT NULL AFTER rol_id;
