@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Colegio Integral Albert Einstein</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --azul: #0B2545;       
+  --azul-dark: #001529;  
+  --amarillo: #EEB902;   
+  --verde: #4B5320;      
+  --ink: #1F2937; 
+  --dim: #4B5563; 
+  --bg: #F4F6F9;
+  
+  --glass-nav: rgba(0, 21, 41, 0.75); 
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.4);
+  --glass-blur: blur(12px);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',sans-serif;color:var(--ink);background:var(--bg);scroll-behavior:smooth;}
+h1,h2,h3,h4,h5{font-family:'Poppins',sans-serif;}
+img{max-width:100%;display:block;object-fit:cover;width:100%;height:100%;}
+a, button{text-decoration:none;color:inherit;cursor:pointer;}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px;}
+.imgbox{border-radius:10px;overflow:hidden;background:#E4E8EE;box-shadow: 0 4px 15px rgba(0,0,0,0.05);}
+
+/* SISTEMA DE PESTAÑAS (SPA) */
+.sub-pagina {
+  display: none;
+  animation: fadeIn 0.4s ease forwards;
+}
+.sub-pagina.activa {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* HEADER Y NAVEGACIÓN */
+header{position:sticky; top:0; z-index:50; background: var(--glass-nav); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border-bottom: 2px solid rgba(255, 255, 255, 0.1); box-shadow:0 4px 20px rgba(0,0,0,.08);}
+.nav-inner{display:flex; align-items:center; gap:16px; padding:12px 20px; max-width:1120px; margin:0 auto;}
+.brand{display:flex; align-items:center; gap:10px; flex:none; background:none; border:none;}
+.brand .logo-img{width:46px; height:46px; border-radius:50%; overflow:hidden; background:#fff; display:flex; align-items:center; justify-content:center; border: 2px solid var(--amarillo);}
+.brand b{font-family:'Poppins'; font-size:13px; color:#ffffff; line-height:1.2; text-align:left; font-weight: 800; text-transform: uppercase; letter-spacing: 0.3px;}
+nav{display:flex; gap:4px; overflow-x:auto; flex:1; justify-content: flex-end; padding-right: 15px;}
+nav button{background:none; border:none; font-family:inherit; font-size:12.5px; font-weight:600; color:rgba(255, 255, 255, 0.85); padding:8px 12px; border-radius:6px; white-space:nowrap; transition: 0.3s;}
+nav button:hover, nav button.nav-activo{background: rgba(255, 255, 255, 0.12); color:#fff;}
+.btn-admisiones{background:var(--amarillo); color:var(--azul-dark)!important; padding:9px 16px; border-radius:6px; font-weight:700; font-size:12.5px; flex:none; text-transform: uppercase; box-shadow: 0 2px 8px rgba(238,185,2,0.3); transition: 0.3s; border:none;}
+.btn-admisiones:hover{background: #fff; transform: translateY(-1px);}
+
+/* HERO PRINCIPAL */
+.hero{position:relative; color:#fff; overflow:hidden; min-height:480px;}
+.hero-img{position:absolute; inset:0; z-index: 1;}
+.hero-overlay{position:absolute; inset:0; background:linear-gradient(100deg, rgba(0, 21, 41, 0.85) 30%, rgba(0, 21, 41, 0.4)); display:flex; align-items:center; z-index: 2;}
+.hero-content{padding:60px 20px; max-width:1120px; margin:0 auto; width:100%;}
+.hero-content h1{font-size:clamp(32px,5vw,52px); font-weight:800; max-width:15ch; line-height:1.15; text-transform: uppercase;}
+.hero-content h1 span{color:var(--amarillo);}
+.hero-content p{margin-top:16px; max-width:46ch; opacity:.9; font-size:16px; line-height: 1.5;}
+.hero-content .btn-amarillo{display:inline-block; margin-top:26px; background:var(--amarillo); color:var(--azul-dark); padding:13px 28px; border-radius:6px; font-weight:700; font-size:13.5px; text-transform: uppercase; transition: 0.3s; border:none;}
+.hero-content .btn-amarillo:hover{background: #fff; transform: scale(1.03);}
+
+/* BARRA DE LOS 5 BOTONES */
+.accesos{display:grid; grid-template-columns:repeat(5,1fr); gap:1px; background: rgba(255,255,255,0.1); border-bottom: 4px solid var(--amarillo); position: relative; z-index: 10;}
+.acceso-item{background: var(--azul-dark); padding:22px 12px; text-align:center; transition: 0.3s; display: flex; flex-direction: column; align-items: center; justify-content: center; border:none;}
+.acceso-item:hover{background: #002244; transform: translateY(-2px);}
+.acceso-item .ic{width: 28px; height: 28px; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; color: #fff;}
+.acceso-item span{font-size:11px; font-weight:700; color:rgba(255,255,255,0.9); text-transform: uppercase; letter-spacing: 0.4px;}
+@media(max-width:850px){.accesos{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:550px){.accesos{grid-template-columns:repeat(2,1fr);}}
+
+section{padding:60px 0;}
+section.alt{background: rgba(234, 238, 243, 0.5);}
+.sec-title{font-size:28px; font-weight:800; color:var(--azul); margin-bottom:6px; text-transform: uppercase;}
+.sec-sub{color:var(--dim); font-size:14px; margin-bottom:30px; max-width:60ch;}
+.section-tag{display:inline-block; background: rgba(11, 37, 69, 0.08); color:var(--azul); font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:5px 12px; border-radius:20px; margin-bottom:12px;}
+
+/* BIENVENIDA */
+.qs-grid{display:grid; grid-template-columns:1.1fr 1fr; gap:40px; align-items:center;}
+.welcome-card-glass { background: var(--glass-bg); border: 1px solid var(--glass-border); backdrop-filter: var(--glass-blur); padding: 35px; border-radius: 12px; }
+
+/* NUEVA SECCIÓN: TARJETAS DE ACCESOS DIRECTOS (DEL DOC) */
+.grid-accesos-directos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-top: 15px; }
+.card-directo { background: #fff; border-radius: 12px; overflow: hidden; border: 1px solid rgba(0,0,0,0.06); box-shadow: 0 4px 12px rgba(0,0,0,0.02); transition: 0.3s; text-align: left; display: flex; flex-direction: column; }
+.card-directo:hover { transform: translateY(-4px); box-shadow: 0 10px 25px rgba(0,0,0,0.06); }
+.card-directo .card-body { padding: 20px; flex: 1; display: flex; flex-direction: column; }
+.card-directo h3 { font-size: 16px; color: var(--azul); font-weight: 700; text-transform: uppercase; margin-bottom: 8px; }
+.card-directo p { font-size: 13px; color: var(--dim); line-height: 1.5; margin-bottom: 16px; flex: 1; }
+.card-directo .btn-link { font-size: 12.5px; font-weight: 700; color: var(--amarillo); text-transform: uppercase; background: var(--azul-dark); padding: 10px; text-align: center; border-radius: 6px; transition: 0.3s; border: none; }
+.card-directo .btn-link:hover { background: var(--azul); color: #fff; }
+@media(max-width:900px){.grid-accesos-directos{grid-template-columns: repeat(2, 1fr);}}
+@media(max-width:550px){.grid-accesos-directos{grid-template-columns: 1fr;}}
+
+/* VALORES */
+.valores-row{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:24px;}
+.valor-item{text-align:center; background: var(--glass-bg); border:1px solid var(--glass-border); backdrop-filter: var(--glass-blur); border-radius:10px; padding:18px 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;}
+.valor-item .ic{width:22px; height:22px; color: var(--azul);}
+.valor-item span{font-size:11.5px; font-weight:700; color:var(--azul); text-transform: uppercase;}
+@media(max-width:800px){.qs-grid{grid-template-columns:1fr;} .valores-row{grid-template-columns:repeat(2,1fr);}}
+
+/* MISIÓN Y VISIÓN */
+.mv-grid{display:grid; grid-template-columns:1fr 1fr; gap:24px;}
+.mv-card{background:#fff; border-radius:14px; overflow:hidden; border:1px solid rgba(0,0,0,0.05); box-shadow: 0 4px 20px rgba(0,0,0,0.02);}
+.mv-card .imgbox{min-height:180px; border-radius:0;}
+.mv-card .body{padding:26px;}
+.mv-card h3{color:var(--azul); font-size:20px; margin-bottom:10px; text-transform: uppercase; font-weight: 800;}
+.mv-card p{font-size:14px; color:var(--dim); line-height:1.6; text-align: justify;}
+@media(max-width:700px){.mv-grid{grid-template-columns:1fr;}}
+
+/* OFERTA ACADÉMICA */
+.oferta-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:18px;}
+.oferta-card{background: var(--glass-bg); border:1px solid var(--glass-border); backdrop-filter: var(--glass-blur); border-radius:14px; padding:28px 20px; text-align:center; box-shadow: 0 4px 15px rgba(0,0,0,0.02); display: flex; flex-direction: column; align-items: center;}
+.oferta-card .ic{width: 40px; height: 40px; margin-bottom: 12px; color: var(--azul);}
+.oferta-card h4{color:var(--azul); font-size:16px; margin-bottom:8px; text-transform: uppercase; font-weight: 700;}
+.oferta-card p{font-size:13px; color:var(--dim); line-height:1.5;}
+@media(max-width:700px){.oferta-grid{grid-template-columns:1fr;}}
+
+/* PROYECTOS */
+.proyectos-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:18px;}
+.proyecto-card{border-radius:12px; overflow:hidden; border:1px solid rgba(0,0,0,0.05); background:#fff; box-shadow: 0 4px 12px rgba(0,0,0,0.02);}
+.proyecto-card .imgbox{min-height:140px; border-radius:0;}
+.proyecto-card .cap{padding:14px; font-size:13.5px; font-weight:700; color:var(--azul); text-transform: uppercase; background: #fff; border-top: 2px solid var(--amarillo);}
+@media(max-width:700px){.proyectos-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:480px){.proyectos-grid{grid-template-columns:1fr;}}
+
+/* GALERÍA */
+.gal-tabs{display:flex; gap:8px; margin-bottom:22px; flex-wrap:wrap;}
+.gal-tabs button{border:1px solid rgba(0,0,0,0.08); background:#fff; padding:8px 16px; border-radius:20px; font-size:12.5px; font-weight:600; color:var(--dim);}
+.gal-tabs button.active{background:var(--azul); color:#fff; border-color:var(--azul);}
+.gal-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:12px;}
+.gal-grid .imgbox{min-height:140px;}
+@media(max-width:700px){.gal-grid{grid-template-columns:repeat(2,1fr);}}
+
+/* NOTICIAS */
+.noticias-list{display:flex; flex-direction:column; gap:14px;}
+.noticia-item{display:flex; gap:16px; background:#fff; border:1px solid rgba(0,0,0,0.04); border-radius:12px; padding:16px; align-items:center;}
+.noticia-fecha{flex:none; width:58px; height:58px; background:var(--azul); color:#fff; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; border-bottom: 3px solid var(--amarillo);}
+.noticia-fecha .d{font-size:19px; font-weight:800; line-height:1;}
+.noticia-fecha .m{font-size:10px; text-transform:uppercase; color: var(--amarillo);}
+.noticia-item h4{font-size:15px; color:var(--azul); margin-bottom:4px; font-weight: 700;}
+.noticia-item p{font-size:12.5px; color:var(--dim);}
+
+/* ADMISIONES */
+.admisiones-grid{display:grid; grid-template-columns:1fr 1fr; gap:40px; align-items:center;}
+.pasos{display:flex; flex-direction:column; gap:16px;}
+.paso{display:flex; gap:14px; align-items:flex-start;}
+.paso .num{flex:none; width:34px; height:34px; border-radius:50%; background:var(--amarillo); color:var(--azul-dark); font-weight:800; display:flex; align-items:center; justify-content:center; font-size:14px;}
+.paso h4{font-size:14.5px; color:var(--azul); margin-bottom:2px; text-transform: uppercase;}
+.paso p{font-size:12.5px; color:var(--dim);}
+@media(max-width:800px){.admisiones-grid{grid-template-columns:1fr;}}
+
+/* CONTACTO Y MAPA */
+.contacto-grid{display:grid; grid-template-columns:1fr 1.1fr; gap:40px;}
+.contacto-info{display:flex; flex-direction:column; gap:16px;}
+.info-row{display:flex; gap:12px; align-items:flex-start; font-size:13.5px;}
+.info-row .ic{flex:none; width:34px; height:34px; background:#fff; border-radius:8px; display:flex; align-items:center; justify-content:center; color: var(--azul); box-shadow: 0 2px 6px rgba(0,0,0,0.04);}
+.contacto-form{display:flex; flex-direction:column; gap:12px; background: var(--glass-bg); border:1px solid var(--glass-border); backdrop-filter: var(--glass-blur); padding:30px; border-radius:14px;}
+.contacto-form input, .contacto-form textarea{border:1px solid rgba(0,0,0,0.08); border-radius:8px; padding:12px 14px; font-family:inherit; font-size:13.5px; background: rgba(255,255,255,0.7);}
+.contacto-form textarea{min-height:100px; resize:vertical;}
+.contacto-form button{background:var(--azul); color:#fff; border:none; padding:13px; border-radius:8px; font-weight:700; font-size:14px; text-transform: uppercase;}
+.map-box{min-height:200px; margin-top:6px; border-radius:10px; overflow:hidden;}
+.map-box iframe{width:100%; height:200px; border:0; display:block;}
+@media(max-width:800px){.contacto-grid{grid-template-columns:1fr;}}
+
+/* VIDA ESTUDIANTIL */
+.vida-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:14px;}
+.vida-item{text-align:center;}
+.vida-item .imgbox{max-width:100px; margin: 0 auto; border-radius:50%; aspect-ratio:1; border: 3px solid var(--verde);}
+.vida-item span{display:block; margin-top:8px; font-size:12px; font-weight:700; color:var(--azul); text-transform: uppercase;}
+
+/* FOOTER */
+footer{background:var(--azul-dark); color:#D6DEEF; padding:60px 0 25px; border-top: 4px solid var(--amarillo); margin-top: 60px;}
+.footer-grid{display:grid; grid-template-columns:1.4fr 1fr 1fr; gap:40px; padding-bottom:30px; border-bottom:1px solid rgba(255,255,255,.08);}
+.footer-grid h5{color:#fff; font-size:14px; margin-bottom:14px; text-transform: uppercase;}
+.footer-grid p{font-size:13px; color:#AAB9D6; line-height:2; margin-bottom: 6px;}
+.footer-grid span{color:#AAB9D6; font-size:13px; cursor:pointer; display:block; line-height:2; transition: 0.2s;}
+.footer-grid span:hover{color: var(--amarillo);}
+.footer-bottom{padding-top:22px; text-align:center; font-size:11.5px; color:#8494B8;}
+
+.wa-float{position:fixed; bottom:20px; right:20px; background:#25D366; color:#fff; width:56px; height:56px; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 16px rgba(0,0,0,.2); z-index:60;}
+.wa-float svg{width: 28px; height: 28px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="nav-inner">
+    <button onclick="cambiarSeccion('inicio')" class="brand">
+      <div class="logo-img">
+        <img src="https://picsum.photos/seed/logoest/100/100" alt="Logo">
+      </div>
+    </button>
+    <b>Colegio Integral<br>Albert Einstein</b>
+    <nav>
+      <button id="nav-inicio" class="nav-activo" onclick="cambiarSeccion('inicio')">Inicio</button>
+      <button id="nav-quienes-somos" onclick="cambiarSeccion('quienes-somos')">¿Quiénes somos?</button>
+      <button id="nav-oferta" onclick="cambiarSeccion('oferta')">Oferta Académica</button>
+      <button id="nav-proyectos" onclick="cambiarSeccion('proyectos')">Proyectos</button>
+      <button id="nav-galeria" onclick="cambiarSeccion('galeria')">Galería</button>
+      <button id="nav-noticias" onclick="cambiarSeccion('noticias')">Noticias</button>
+      <button id="nav-vida-estudiantil" onclick="cambiarSeccion('vida-estudiantil')">Vida estudiantil</button>
+      <button id="nav-contacto" onclick="cambiarSeccion('contacto')">Contáctenos</button>
+    </nav>
+    <button onclick="cambiarSeccion('admisiones')" class="btn-admisiones">Admisiones</button>
+  </div>
+</header>
+
+<div id="pag-inicio" class="sub-pagina activa">
+  <section class="hero" id="inicio">
+    <div class="hero-img"><img src="https://picsum.photos/seed/schoolbuilding/1600/900" alt="Colegio"></div>
+    <div class="hero-overlay">
+      <div class="hero-content">
+        <h1>Formamos hoy a los <span>líderes</span> del mañana</h1>
+        <p>Educación integral con valores, excelencia académica y compromiso social.</p>
+        <button onclick="cambiarSeccion('quienes-somos')" class="btn-amarillo">Conócenos</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="accesos">
+    <button onclick="cambiarSeccion('quienes-somos')" class="acceso-item">
+      <div class="ic">📚</div>
+      <span>Formación Integral</span>
+    </button>
+    <button onclick="cambiarSeccion('oferta')" class="acceso-item">
+      <div class="ic">🎓</div>
+      <span>Excelencia Académica</span>
+    </button>
+    <button onclick="cambiarSeccion('quienes-somos')" class="acceso-item">
+      <div class="ic">⭐</div>
+      <span>Valores y Principios</span>
+    </button>
+    <button onclick="cambiarSeccion('quienes-somos')" class="acceso-item">
+      <div class="ic">❤️</div>
+      <span>Educación con Amor</span>
+    </button>
+    <button onclick="cambiarSeccion('proyectos')" class="acceso-item">
+      <div class="ic">💻</div>
+      <span>Innovación y Tecnología</span>
+    </button>
+  </div>
+
+  <section class="alt">
+    <div class="wrap">
+      <div class="qs-grid">
+        <div class="welcome-card-glass">
+          <span class="section-tag">Bienvenida</span>
+          <h2 class="sec-title">Bienvenidos al Colegio Integral Albert Einstein</h2>
+          <p style="color:var(--dim); font-size:14.5px; line-height:1.7; margin-top:14px; text-align: justify;">
+            Somos una institución educativa comprometida con la formación académica, ética y humana de nuestros estudiantes, inspirados en los valores que forjan un mejor futuro. Creemos fielmente en el potencial de cada niño y trabajamos de la mano con las familias para asegurar un crecimiento armónico y equilibrado.
+          </p>
+        </div>
+        <div class="imgbox" style="min-height:280px; border-radius: 0 0 0 80px;"><img src="https://picsum.photos/seed/rector/600/500" alt="Estudiantes"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <span class="section-tag">Accesos Directos</span>
+      <h2 class="sec-title">Explora Nuestro Colegio</h2>
+      <p class="sec-sub">Ingresa de manera directa a los módulos más importantes de nuestra comunidad.</p>
+      
+      <div class="grid-accesos-directos">
+        <div class="card-directo">
+          <div class="imgbox" style="height:130px; border-radius:12px 12px 0 0;"><img src="https://picsum.photos/seed/cardqs/400/250"></div>
+          <div class="card-body">
+            <h3>¿Quiénes Somos?</h3>
+            <p>Conoce nuestra hermosa historia, pilares institucionales y filosofía académica.</p>
+            <button onclick="cambiarSeccion('quienes-somos')" class="btn-link">Ver más</button>
+          </div>
+        </div>
+        
+        <div class="card-directo">
+          <div class="imgbox" style="height:130px; border-radius:12px 12px 0 0;"><img src="https://picsum.photos/seed/cardproy/400/250"></div>
+          <div class="card-body">
+            <h3>Nuestros Proyectos</h3>
+            <p>Descubre las áreas transversales: proyectos ambientales, culturales y tecnológicos.</p>
+            <button onclick="cambiarSeccion('proyectos')" class="btn-link">Ver más</button>
+          </div>
+        </div>
+
+        <div class="card-directo">
+          <div class="imgbox" style="height:130px; border-radius:12px 12px 0 0;"><img src="https://picsum.photos/seed/cardgal/400/250"></div>
+          <div class="card-body">
+            <h3>Galería de Fotos</h3>
+            <p>Un recorrido visual por nuestras aulas, eventos especiales e infraestructura.</p>
+            <button onclick="cambiarSeccion('galeria')" class="btn-link">Ver fotos</button>
+          </div>
+        </div>
+
+        <div class="card-directo">
+          <div class="imgbox" style="height:130px; border-radius:12px 12px 0 0;"><img src="https://picsum.photos/seed/cardadm/400/250"></div>
+          <div class="card-body">
+            <h3>Admisiones</h3>
+            <p>Consulta los pasos, requisitos y fechas de matrículas para el periodo actual.</p>
+            <button onclick="cambiarSeccion('admisiones')" class="btn-link">Solicitar cupo</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="pag-quienes-somos" class="sub-pagina">
+  <section class="alt">
+    <div class="wrap">
+      <span class="section-tag">Nuestra identidad</span>
+      <h2 class="sec-title">¿Quiénes somos?</h2>
+      <p class="sec-sub">Conoce nuestra historia, filosofía y los valores que nos definen como institución.</p>
+      <div class="qs-grid">
+        <div class="imgbox"><img src="https://picsum.photos/seed/instalaciones/600/500" alt="Instalaciones"></div>
+        <div>
+          <h3 style="color:var(--azul); font-size:18px; margin-bottom:10px; text-transform: uppercase; font-weight:700;">Nuestra Filosofía</h3>
+          <p style="color:var(--dim); font-size:14px; line-height:1.7; text-align: justify;">
+            El Colegio Integral Albert Einstein nace con el firme propósito de ofrecer una educación de altísima calidad, fundamentada en el desarrollo del ser. Promovemos ambientes donde el respeto mutuo, la curiosidad científica y el amor por el conocimiento configuran el día a día.
+          </p>
+          <h3 style="color:var(--azul); font-size:18px; margin:18px 0 10px; text-transform: uppercase; font-weight:700;">Modelo Pedagógico</h3>
+          <p style="color:var(--dim); font-size:14px; line-height:1.7; text-align: justify;">
+            Nuestro enfoque combina metodologías activas y aprendizaje basado en proyectos, estimulando las habilidades blandas indispensables para el siglo XXI.
+          </p>
+        </div>
+      </div>
+      
+      <div class="valores-row">
+        <div class="valor-item"><div class="ic">🛡️</div><span>Valores</span></div>
+        <div class="valor-item"><div class="ic">🤝</div><span>Respeto</span></div>
+        <div class="valor-item"><div class="ic">📝</div><span>Responsabilidad</span></div>
+        <div class="valor-item"><div class="ic">✨</div><span>Honestidad</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <span class="section-tag">Direccionamiento</span>
+      <h2 class="sec-title">Misión y Visión</h2>
+      <div class="mv-grid" style="margin-top:24px;">
+        <div class="mv-card">
+          <div class="imgbox"><img src="https://picsum.photos/seed/mision/600/400" alt="Misión"></div>
+          <div class="body">
+            <h3>Misión</h3>
+            <p>Formar estudiantes íntegros, analíticos y solidarios mediante un ecosistema educativo de excelencia, potenciando sus competencias individuales para liderar transformaciones positivas en su comunidad.</p>
+          </div>
+        </div>
+        <div class="mv-card">
+          <div class="imgbox"><img src="https://picsum.photos/seed/vision/600/400" alt="Visión"></div>
+          <div class="body">
+            <h3>Visión</h3>
+            <p>Consolidarnos como un referente educativo nacional en vanguardia pedagógica, inclusión y desarrollo humano integral, entregando líderes éticos preparados para los desafíos globales.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="pag-oferta" class="sub-pagina">
+  <section class="alt">
+    <div class="wrap">
+      <span class="section-tag">Niveles</span>
+      <h2 class="sec-title">Oferta académica</h2>
+      <p class="sec-sub">Formación estructurada por ciclos para potenciar cada etapa del crecimiento.</p>
+      <div class="oferta-grid">
+        <div class="oferta-card">
+          <div class="ic" style="font-size:30px;">🧸</div>
+          <h4>Preescolar</h4>
+          <p>Estimulación temprana y desarrollo psicomotriz mediante actividades lúdicas dirigidas.</p>
+        </div>
+        <div class="oferta-card">
+          <div class="ic" style="font-size:30px;">🎒</div>
+          <h4>Primaria</h4>
+          <p>Consolidación de saberes fundamentales, operaciones matemáticas y compresión lectora avanzada.</p>
+        </div>
+        <div class="oferta-card">
+          <div class="ic" style="font-size:30px;">📐</div>
+          <h4>Bachillerato</h4>
+          <p>Profundización en ciencias exactas, humanidades y preparación sólida para pruebas de estado.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="pag-proyectos" class="sub-pagina">
+  <section>
+    <div class="wrap">
+      <span class="section-tag">Iniciativas Transversales</span>
+      <h2 class="sec-title">Nuestros proyectos institucionales</h2>
+      <p class="sec-sub">Ejes conceptuales prácticos en los que participan activamente nuestros alumnos.</p>
+      <div class="proyectos-grid">
+        <div class="proyecto-card"><div class="imgbox"><img src="https://picsum.photos/seed/amb/400/260"></div><div class="cap">Proyecto Ambiental (PRAE)</div></div>
+        <div class="proyecto-card"><div class="imgbox"><img src="https://picsum.photos/seed/lec/400/260"></div><div class="cap">Plan Lector Estudiantil</div></div>
+        <div class="proyecto-card"><div class="imgbox"><img src="https://picsum.photos/seed/dep/400/260"></div><div class="cap">Torneos Deportivos Internos</div></div>
+        <div class="proyecto-card"><div class="imgbox"><img src="https://picsum.photos/seed/cul/400/260"></div><div class="cap">Centro Cultural y Artístico</div></div>
+        <div class="proyecto-card"><div class="imgbox"><img src="https://picsum.photos/seed/tec/400/260"></div><div class="cap">Robótica e Innovación</div></div>
+        <div class="proyecto-card"><div class="imgbox"><img src="https://picsum.photos/seed/con/400/260"></div><div class="cap">Comité de Convivencia y Paz</div></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="pag-galeria" class="sub-pagina">
+  <section class="alt">
+    <div class="wrap">
+      <span class="section-tag">Recuerdos</span>
+      <h2 class="sec-title">Galería de imágenes</h2>
+      <div class="gal-tabs">
+        <button class="active" onclick="filterGal('todas', this)">Todas</button>
+        <button onclick="filterGal('instalaciones', this)">Instalaciones</button>
+        <button onclick="filterGal('eventos', this)">Eventos</button>
+        <button onclick="filterGal('academicas', this)">Académicas</button>
+      </div>
+      <div class="gal-grid" id="galGrid">
+        <div class="imgbox" data-cat="instalaciones"><img src="https://picsum.photos/seed/g1/400/300"></div>
+        <div class="imgbox" data-cat="eventos"><img src="https://picsum.photos/seed/g2/400/300"></div>
+        <div class="imgbox" data-cat="academicas"><img src="https://picsum.photos/seed/g3/400/300"></div>
+        <div class="imgbox" data-cat="eventos"><img src="https://picsum.photos/seed/g4/400/300"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="pag-noticias" class="sub-pagina">
+  <section>
+    <div class="wrap">
+      <span class="section-tag">Boletín</span>
+      <h2 class="sec-title">Noticias y Eventos</h2>
+      <div class="noticias-list">
+        <div class="noticia-item">
+          <div class="noticia-fecha"><span class="d">15</span><span class="m">May</span></div>
+          <div><h4>Gran Feria Científica Einstein 2026</h4><p>Muestra colectiva de experimentos mecánicos y robóticos automatizados por estudiantes de secundaria.</p></div>
+        </div>
+        <div class="noticia-item">
+          <div class="noticia-fecha"><span class="d">23</span><span class="m">Abr</span></div>
+          <div><h4>Celebración del Día del Idioma y Salón Literario</h4><p>Obras teatrales y recitales poéticos en conmemoración de la riqueza del lenguaje hispano.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="pag-vida-estudiantil" class="sub-pagina">
+  <section class="alt">
+    <div class="wrap">
+      <span class="section-tag">Comunidad</span>
+      <h2 class="sec-title">Vida estudiantil</h2>
+      <div class="vida-grid" style="margin-top:24px;">
+        <div class="vida-item"><div class="imgbox"><img src="https://picsum.photos/seed/vd1/200/200"></div><span>Club de Fútbol</span></div>
+        <div class="vida-item"><div class="imgbox"><img src="https://picsum.photos/seed/vd2/200/200"></div><span>Danza Folclórica</span></div>
+        <div class="vida-item"><div class="imgbox"><img src="https://picsum.photos/seed/vd3/200/200"></div><span>Salidas Ecológicas</span></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="pag-admisiones" class="sub-pagina">
+  <section class="alt">
+    <div class="wrap">
+      <span class="section-tag">Inscripciones</span>
+      <h2 class="sec-title">Proceso de admisión 2026</h2>
+      <div class="admisiones-grid" style="margin-top:24px;">
+        <div class="pasos">
+          <div class="paso"><div class="num">1</div><div><h4>Paso 1: Postulación</h4><p>Diligencia el formulario digital o presencial adjuntando la ficha escolar básica.</p></div></div>
+          <div class="paso"><div class="num">2</div><div><h4>Paso 2: Entrevista</h4><p>Espacio de diálogo psicosocial junto a los padres de familia.</p></div></div>
+          <div class="paso"><div class="num">3</div><div><h4>Paso 3: Matrícula</h4><p>Asignación de cupo oficial y radicación de documentos legales en secretaría.</p></div></div>
+        </div>
+        <div class="imgbox" style="min-height:260px;"><img src="https://picsum.photos/seed/admis/600/500"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="pag-contacto" class="sub-pagina">
+  <section>
+    <div class="wrap">
+      <span class="section-tag">Contacto directo</span>
+      <h2 class="sec-title">Contáctenos</h2>
+      <div class="contacto-grid" style="margin-top:24px;">
+        <div class="contacto-info">
+          <div class="info-row"><div class="ic">📍</div><div><strong>Ubicación</strong><br>Carrera 4 Bis #58-34, Bogotá, Colombia</div></div>
+          <div class="info-row"><div class="ic">📞</div><div><strong>Atención Telefónica</strong><br>(601) 5714010 - 316 3766890</div></div>
+          <div class="map-box"><iframe src="about:blank"></iframe></div>
+        </div>
+        <form class="contacto-form" onsubmit="event.preventDefault(); alert('Mensaje enviado');">
+          <input type="text" placeholder="Tu nombre completo" required>
+          <input type="email" placeholder="Correo electrónico de contacto" required>
+          <textarea placeholder="¿En qué podemos ayudarte?" required></textarea>
+          <button type="submit">Enviar solicitud</button>
+        </form>
+      </div>
+    </div>
+  </section>
+</div>
+
+<footer>
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <h5 style="margin-bottom:10px;">Colegio Integral Albert Einstein</h5>
+        <p>Formamos líderes íntegros con sólidos valores morales y altos estándares de excelencia académica.</p>
+      </div>
+      <div>
+        <h5>Enlaces Rápidos</h5>
+        <span onclick="cambiarSeccion('inicio')">Inicio (Home)</span>
+        <span onclick="cambiarSeccion('quienes-somos')">¿Quiénes somos?</span>
+        <span onclick="cambiarSeccion('proyectos')">Nuestros Proyectos</span>
+        <span onclick="cambiarSeccion('admisiones')">Proceso de Admisión</span>
+      </div>
+      <div>
+        <h5>Contacto Legal</h5>
+        <p>📍 Carrera 4 Bis #58-34</p>
+        <p>📧 oficina@balletnacional.com.co</p>
+        <p>📱 316 3766890</p>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      © 2026 Colegio Integral Albert Einstein. Todos los derechos reservados.
+    </div>
+  </div>
+</footer>
+
+<a class="wa-float" href="https://wa.me/573163766890" target="_blank">
+  <svg fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.454 5.709 1.455h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+</a>
+
+<script>
+function cambiarSeccion(targetId) {
+  document.querySelectorAll('.sub-pagina').forEach(pag => {
+    pag.classList.remove('activa');
+  });
+  
+  const paginaObjetivo = document.getElementById('pag-' + targetId);
+  if(paginaObjetivo) {
+    paginaObjetivo.classList.add('activa');
+  }
+  
+  document.querySelectorAll('nav button').forEach(btn => {
+    btn.classList.remove('nav-activo');
+  });
+  const botonNav = document.getElementById('nav-' + targetId);
+  if(botonNav) {
+    botonNav.classList.add('nav-activo');
+  }
+  
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function filterGal(cat, btn){
+  document.querySelectorAll('.gal-tabs button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('#galGrid .imgbox').forEach(el=>{
+    el.style.display = (cat==='todas' || el.dataset.cat===cat) ? 'block' : 'none';
+  });
+}
+</script>
+
+</body>
+</html>
