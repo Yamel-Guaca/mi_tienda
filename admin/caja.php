@@ -527,10 +527,10 @@ document.addEventListener("DOMContentLoaded", () => {
         $reportVirtualPayments = (float) $reportVirtualPayments;
         $reportGastos = (float) $reportGastos;
 
-        // Diferencia: incluir gastos y pagos virtuales
+        // Diferencia: ajustar para que coincida con "Últimas cajas"
+        // cierre - (apertura + ventas + gastos)
         $repDiff = (float)$rep['closing_amount']
-                 - ( (float)$rep['opening_amount'] + $reportVentas + $reportGastos )
-                 + $reportVirtualPayments;
+                 - ( (float)$rep['opening_amount'] + $reportVentas + $reportGastos );
     ?>
 <div class="report" id="report-cierre">
     <h4>Reporte de Cierre - Caja #<?= htmlspecialchars($rep['id']) ?></h4>
@@ -549,16 +549,18 @@ document.addEventListener("DOMContentLoaded", () => {
     <div class="row"><div class="bold">Ventas virtuales en la sesión:</div><div>$<?= number_format($reportVirtualPayments,0,",",".") ?></div></div>
     <div class="row"><div class="bold">Gastos en la sesión:</div><div>$<?= number_format($reportGastos,0,",",".") ?></div></div>
 
-    <div class="row"><div class="bold">Diferencia (cierre - (apertura + ventas + gastos) + virtuales):</div>
-        <div><?= ($repDiff >= 0 ? '+' : '-') . '$' . number_format(abs($repDiff),0,",",".") ?></div>
+    <div class="row">
+    <div class="label">Diferencia (cierre - (apertura + ventas + gastos))</div>
+    <div class="value"><?= ($difference >= 0 ? '+' : '-') . $fmt(abs($difference)) ?></div>
     </div>
+
 
     <div style="margin-top:8px;">
         <strong>Notas:</strong>
         <ul>
             <li>El monto de cierre es el valor contado por el cajero al momento de cerrar.</li>
             <li>La diferencia considera las ventas y gastos registrados en el periodo de la sesión.</li>
-            <li>Los pagos virtuales se suman aparte si no están incluidos en las ventas.</li>
+            <li>Los pagos virtuales se muestran aparte como información, pero no se suman si ya están incluidos en las ventas.</li>
         </ul>
     </div>
 

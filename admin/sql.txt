@@ -1,4 +1,4 @@
-DROP TABLE IF EXISTS gastos;
+se creo el gasto en la base de datos
 
 CREATE TABLE gastos (
   id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -31,3 +31,5 @@ Ejecuta en tu gestor MySQL (phpMyAdmin o consola):
 
 ALTER TABLE gastos
 ADD COLUMN branch_id INT NULL AFTER rol_id;
+
+
