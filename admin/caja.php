@@ -531,6 +531,12 @@ document.addEventListener("DOMContentLoaded", () => {
         // cierre - (apertura + ventas + gastos)
         $repDiff = (float)$rep['closing_amount']
                  - ( (float)$rep['opening_amount'] + $reportVentas + $reportGastos );
+
+
+        // Calcula la diferencia antes de imprimir
+        $difference = (float)$rep['closing_amount']
+                    - ( (float)$rep['opening_amount'] + (float)$reportVentas + (float)$reportGastos );
+
     ?>
 <div class="report" id="report-cierre">
     <h4>Reporte de Cierre - Caja #<?= htmlspecialchars($rep['id']) ?></h4>
@@ -548,11 +554,7 @@ document.addEventListener("DOMContentLoaded", () => {
     <div class="row"><div class="bold">Ventas en la sesión:</div><div>$<?= number_format($reportVentas,0,",",".") ?></div></div>
     <div class="row"><div class="bold">Ventas virtuales en la sesión:</div><div>$<?= number_format($reportVirtualPayments,0,",",".") ?></div></div>
     <div class="row"><div class="bold">Gastos en la sesión:</div><div>$<?= number_format($reportGastos,0,",",".") ?></div></div>
-
-    <div class="row">
-    <div class="label">Diferencia (cierre - (apertura + ventas + gastos))</div>
-    <div class="value"><?= ($difference >= 0 ? '+' : '-') . $fmt(abs($difference)) ?></div>
-    </div>
+    <div class="row">  <div class="label">Diferencia (cierre - (apertura + ventas + gastos))</div>  <div class="value"><?= ($difference >= 0 ? '+' : '-') . '$' . number_format(abs($difference), 0, ",", ".") ?></div></div>
 
 
     <div style="margin-top:8px;">

@@ -1,0 +1,10 @@
+antes de cargar el git hub
+
+revissar el config.php que este en hostinguer o en el xamp para trabajar sin errores
+
+tener en cuenta si el git hub alla se pueden crear doble copia del archivo modificado 
+
+guardar copia de seguridad
+guardar copia de seguridad
+guardar copia de seguridad
+
