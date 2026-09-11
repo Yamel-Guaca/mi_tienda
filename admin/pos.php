@@ -226,6 +226,94 @@ if ($currentSubcategoryId > 0) {
 
 /* Small helper to visually hide labels for accessibility */
 .sr-only { position:absolute; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden; }
+
+/* ===== Estilos generales del header ===== */
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #2c3e50;   /* color de fondo */
+  padding: 10px 20px;
+  color: #fff;
+  font-family: Arial, sans-serif;
+}
+
+/* Título a la izquierda */
+header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+/* Contenedor de enlaces a la izquierda */
+.header-left div {
+  margin-top: 5px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.header-left a {
+  color: #ecf0f1;
+  text-decoration: none;
+  padding: 6px 10px;
+  border-radius: 4px;
+  transition: background 0.3s, color 0.3s;
+}
+
+.header-left a:hover {
+  background: #1abc9c;
+  color: #fff;
+}
+
+/* Botones a la derecha */
+.header-right {
+  display: flex;
+  gap: 10px;
+}
+
+.header-right .btn {
+  padding: 8px 14px;
+  border-radius: 4px;
+  text-decoration: none;
+  background: #3498db;
+  color: #fff;
+  transition: background 0.3s;
+}
+
+.header-right .btn:hover {
+  background: #2980b9;
+}
+
+.header-right .btn-danger {
+  background: #e74c3c;
+}
+
+.header-right .btn-danger:hover {
+  background: #c0392b;
+}
+
+/* ===== Responsivo ===== */
+@media (max-width: 768px) {
+  header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .header-left div {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .header-right {
+    margin-top: 10px;
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -239,6 +327,7 @@ if ($currentSubcategoryId > 0) {
       <a href="#">Traslado de Mercancía</a>
       <a href="/mi_tienda/admin/listado_productos.php">Listado Pedidos</a>
       <a href="/mi_tienda/admin/dashboard.php">Administrador</a>
+      <a href="/mi_tienda/admin/inventario_bajo.php">Inventario Bajo</a>
 
       <a href="/mi_tienda/admin/gastos.php">Gastos Local</a>      
 
@@ -246,7 +335,7 @@ if ($currentSubcategoryId > 0) {
     </div>
   </div>
   <div class="header-right">
-    <a href="pos.php?mode=tactil" class="btn">Modo táctil</a>
+    
     <a href="/mi_tienda/admin/logout.php" class="btn btn-danger">Cerrar sesión</a>
   </div>
 </header>

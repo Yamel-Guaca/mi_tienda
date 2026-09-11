@@ -255,17 +255,6 @@ $sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
     .report .row { display:flex; justify-content:space-between; margin-bottom:6px; }
     .report .bold { font-weight:bold; }
 
-
-
-
-
-
-
-
-
-
-
-
     /* Alternar "sombra" de color (azul/rojo) debajo de cada fila */
 table tbody tr { position:relative; }
 table tbody tr::after {
@@ -297,7 +286,6 @@ table tbody tr:nth-child(even)::after {
 </style>
 </head>
 <body>
-
 <header>
     <h2>Caja / Arqueo</h2>
     <div class="branch">Sucursal actual: <strong><?= htmlspecialchars($currentBranchName) ?></strong></div>
@@ -402,13 +390,7 @@ function actualizarArqueo() {
     }
 }
 
-
-
-
-
-
-
-    // Recalcular diferencia (UI del panel en cierre)
+// Recalcular diferencia (UI del panel en cierre)
 function recalcularDiferencia() {
     const diffBox = document.getElementById("diff-box");
     if (!diffBox) return;
@@ -417,7 +399,23 @@ function recalcularDiferencia() {
     const apertura = parseMiles(aperturaTexto);
     const cierreTexto = document.getElementById("closing_amount")?.value || "0";
     const cierre = parseMiles(cierreTexto);
-    const diferencia = cierre - apertura;
+
+    // --- NUEVA LÓGICA ---
+    // Efectivo a retirar
+    const valorRetirar = cierre - apertura;
+
+    // Obtener ventas, virtuales y gastos desde elementos (pueden estar ocultos)
+    const ventasTexto = document.getElementById("ventas_sesion")?.textContent || "0";
+    const ventas = parseMiles(ventasTexto);
+
+    const virtualTexto = document.getElementById("ventas_virtuales")?.textContent || "0";
+    const virtuales = parseMiles(virtualTexto);
+
+    const gastosTexto = document.getElementById("gastos_sesion")?.textContent || "0";
+    const gastos = parseMiles(gastosTexto);
+
+    // Diferencia con la fórmula definida
+    const diferencia = valorRetirar + virtuales + gastos - ventas;
 
     const elA = document.getElementById("diff-apertura");
     const elC = document.getElementById("diff-cierre");
@@ -517,53 +515,64 @@ document.addEventListener("DOMContentLoaded", () => {
         <small style="display:block; margin-top:8px; color:#666;">Para descuadre considerando ventas de la sesión, ver columna “Diferencia” en el historial.</small>
     </div>
 
-    <?php
-    if ($reportSession):
-        $rep = $reportSession;
-        $valor_retirar = floatval($rep['closing_amount']) - floatval($rep['opening_amount']);
+<?php
+if ($reportSession):
+    $rep = $reportSession;
 
-        // Asegurar tipos numéricos
-        $reportVentas = (float) $reportVentas;
-        $reportVirtualPayments = (float) $reportVirtualPayments;
-        $reportGastos = (float) $reportGastos;
+    // Efectivo a retirar
+    $valor_retirar = (float)$rep['closing_amount'] - (float)$rep['opening_amount'];
 
-        // Diferencia: ajustar para que coincida con "Últimas cajas"
-        // cierre - (apertura + ventas + gastos)
-        $repDiff = (float)$rep['closing_amount']
-                 - ( (float)$rep['opening_amount'] + $reportVentas + $reportGastos );
+    // Asegurar tipos numéricos
+    $reportVentas = (float)$reportVentas;
+    $reportVirtualPayments = (float)$reportVirtualPayments;
+    $reportGastos = (float)$reportGastos;
 
+    // Nueva lógica de diferencia
+    $difference = $valor_retirar + $reportVirtualPayments + $reportGastos - $reportVentas;
+?>
+<style>
+    .excel-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+    }
+    .excel-table th, .excel-table td {
+        border: 1px solid #999;
+        padding: 8px;
+        text-align: left;
+    }
+    .excel-table th {
+        background-color: #f2f2f2;
+        font-weight: bold;
+    }
+    .excel-table tr:nth-child(even) {
+        background-color: #fafafa;
+    }
+</style>
 
-        // Calcula la diferencia antes de imprimir
-        $difference = (float)$rep['closing_amount']
-                    - ( (float)$rep['opening_amount'] + (float)$reportVentas + (float)$reportGastos );
-
-    ?>
 <div class="report" id="report-cierre">
     <h4>Reporte de Cierre - Caja #<?= htmlspecialchars($rep['id']) ?></h4>
 
-    <div class="row"><div class="bold">Usuario:</div><div><?= htmlspecialchars($rep['user_name']) ?></div></div>
-    <div class="row"><div class="bold">Sucursal:</div><div><?= htmlspecialchars($currentBranchName) ?></div></div>
-    <div class="row"><div class="bold">Apertura registrada:</div><div>$<?= number_format($rep['opening_amount'],0,",",".") ?> (<?= $rep['opened_at'] ?>)</div></div>
-    <div class="row"><div class="bold">Cierre contado:</div><div>$<?= number_format($rep['closing_amount'],0,",",".") ?> (<?= $rep['closed_at'] ?>)</div></div>
+    <table class="excel-table">
+        <tr><th>Usuario</th><td><?= htmlspecialchars($rep['user_name']) ?></td></tr>
+        <tr><th>Sucursal</th><td><?= htmlspecialchars($currentBranchName) ?></td></tr>
+        <tr><th>Apertura registrada</th><td>$<?= number_format($rep['opening_amount'],0,",",".") ?> (<?= $rep['opened_at'] ?>)</td></tr>
+        <tr><th>Cierre contado</th><td>$<?= number_format($rep['closing_amount'],0,",",".") ?> (<?= $rep['closed_at'] ?>)</td></tr>
+        <tr><th>Valor a retirar</th><td>$<?= number_format($valor_retirar,0,",",".") ?></td></tr>
+        <tr><th>Ventas en la sesión</th><td>$<?= number_format($reportVentas,0,",",".") ?></td></tr>
+        <tr><th>Ventas virtuales en la sesión</th><td>$<?= number_format($reportVirtualPayments,0,",",".") ?></td></tr>
+        <tr><th>Gastos en la sesión</th><td>$<?= number_format($reportGastos,0,",",".") ?></td></tr>
+        <tr><th>Diferencia (efectivo + virtuales + gastos - ventas)</th>
+            <td><?= ($difference >= 0 ? '+' : '-') . '$' . number_format(abs($difference),0,",",".") ?></td></tr>
+    </table>
 
-    <!-- Mostrar Valor a retirar -->
-    <div class="row"><div class="bold">Valor a retirar:</div>
-        <div><?= ($valor_retirar >= 0 ? '' : '-') . '$' . number_format(abs($valor_retirar),0,",",".") ?></div>
-    </div>
-
-    <div class="row"><div class="bold">Ventas en la sesión:</div><div>$<?= number_format($reportVentas,0,",",".") ?></div></div>
-    <div class="row"><div class="bold">Ventas virtuales en la sesión:</div><div>$<?= number_format($reportVirtualPayments,0,",",".") ?></div></div>
-    <div class="row"><div class="bold">Gastos en la sesión:</div><div>$<?= number_format($reportGastos,0,",",".") ?></div></div>
-    <div class="row">  <div class="label">Diferencia (cierre - (apertura + ventas + gastos))</div>  <div class="value"><?= ($difference >= 0 ? '+' : '-') . '$' . number_format(abs($difference), 0, ",", ".") ?></div></div>
-
-
-    <div style="margin-top:8px;">
-        <strong>Notas:</strong>
-        <ul>
-            <li>El monto de cierre es el valor contado por el cajero al momento de cerrar.</li>
-            <li>La diferencia considera las ventas y gastos registrados en el periodo de la sesión.</li>
-            <li>Los pagos virtuales se muestran aparte como información, pero no se suman si ya están incluidos en las ventas.</li>
-        </ul>
+    <!-- Valores ocultos para que el JS pueda leerlos y calcular la misma diferencia en el panel -->
+    <div style="display:none;">
+        <span id="ventas_sesion"><?= number_format($reportVentas,0,",",".") ?></span>
+        <span id="ventas_virtuales"><?= number_format($reportVirtualPayments,0,",",".") ?></span>
+        <span id="gastos_sesion"><?= number_format($reportGastos,0,",",".") ?></span>
     </div>
 
     <div style="margin-top:12px; display:flex; gap:8px;">
@@ -611,7 +620,7 @@ if ($currentUserRole == 1):
                 <th>Valor a Retirar</th>
             </tr>
         </thead>
-        <tbody>
+            <tbody>
             <?php foreach ($sessions as $s): ?>
             <?php
                 $openedAt = $s['opened_at'];
@@ -629,18 +638,19 @@ if ($currentUserRole == 1):
                 $stmtGastos->execute([$currentBranchId, $openedAt, $closedAt]);
                 $gastosSesion = (float)$stmtGastos->fetchColumn();
 
-                // Calcular diferencia incluyendo gastos
-                $diff = null;
-                if ($s['closing_amount'] !== null) {
-                    $diff = $s['closing_amount'] - ($s['opening_amount'] + $ventasSesion + $gastosSesion);
-                }
-                $diffTexto = ($diff === null) ? '-' : (($diff >= 0 ? '+' : '-') . '$' . number_format(abs($diff), 0, ",", "."));
-
                 // Valor a retirar por sesión
                 $withdrawSesion = null;
                 if ($s['closing_amount'] !== null) {
-                    $withdrawSesion = floatval($s['closing_amount']) - floatval($s['opening_amount']);
+                    $withdrawSesion = (float)$s['closing_amount'] - (float)$s['opening_amount'];
                 }
+
+                // Calcular diferencia con la nueva lógica
+                $diff = null;
+                if ($s['closing_amount'] !== null) {
+                    $diff = $withdrawSesion + $virtualSesion + $gastosSesion - $ventasSesion;
+                }
+
+                $diffTexto = ($diff === null) ? '-' : (($diff >= 0 ? '+' : '-') . '$' . number_format(abs($diff), 0, ",", "."));
                 $withdrawTexto = ($withdrawSesion === null) ? '-' : ('$' . number_format($withdrawSesion, 0, ",", "."));
             ?>
             <tr>
@@ -658,6 +668,8 @@ if ($currentUserRole == 1):
             </tr>
             <?php endforeach; ?>
         </tbody>
+
+
     </table>
 <?php
 endif; // fin condicional de rol

@@ -5,6 +5,7 @@
 //  - Soporte para reimpresión de gasto (gasto_id) y guardado opcional
 //  - Inclusión de gastos en el reporte de cierre y guardado del HTML del cierre
 //  - Asegurar que el encabezado use los datos de la sucursal correspondiente en gasto, cierre y factura
+//  - Cierre automático de la ventana de factura a los 60 segundos (Opción A mínima)
 // No eliminé ni reescribí tus comentarios originales salvo donde fue estrictamente necesario
 // para integrar las nuevas consultas y guardados. — Yamel
 
@@ -295,17 +296,10 @@ if ($closureId > 0) {
     $stmt->execute([$c['branch_id'], $opening_at, $closing_at]);
     $sales_expenses = floatval($stmt->fetchColumn());
 
-    // Diferencia: cierre - (apertura + ventas + gastos) + ventas_virtual (si corresponde)
+    // Diferencia: usar la fórmula consistente con caja:
+    // Diferencia = (valor a retirar) + ventas virtuales + gastos - ventas
     $opening_amount = floatval($c['opening_amount'] ?? 0);
     $closing_amount = floatval($c['closing_amount'] ?? 0);
-
-    // CORRECCIÓN: incluir ventas virtuales que no estén ya incluidas en orders.total
-    // Si en tu modelo orders.total ya incluye pagos virtuales, quita la suma de $sales_virtual.
-    // Diferencia: cierre - (apertura + ventas + gastos)
-    // Usamos la misma fórmula que en "Últimas cajas" para mantener consistencia.
-    $difference = $closing_amount - ($opening_amount + $sales_total + $sales_expenses);
-
-
 
     // --- NUEVO: valor a retirar (dejar la apertura en caja) ---
     $withdraw_amount = $closing_amount - $opening_amount;
@@ -317,6 +311,9 @@ if ($closureId > 0) {
     $fmt = function($v){ return '$' . number_format(floatval($v), 0, ",", "."); }; // sin decimales; cambia a 2 si quieres
     $opening_display = htmlspecialchars($opening_at);
     $closing_display = htmlspecialchars($closing_at);
+
+    // Calcular diferencia con la misma lógica que en caja
+    $difference = $withdraw_amount + $sales_virtual + $sales_expenses - $sales_total;
 
     // Generar HTML del cierre usando output buffering para poder guardar el HTML luego
     ob_start();
@@ -409,7 +406,7 @@ if ($closureId > 0) {
         <div class="sep"></div>
 
         <div class="row">
-          <div class="label">Diferencia (cierre - (apertura + ventas))</div>
+          <div class="label">Diferencia (efectivo + virtuales + gastos - ventas)</div>
           <div class="value"><?= ($difference >= 0 ? '+' : '-') . $fmt(abs($difference)) ?></div>
         </div>
 
@@ -458,6 +455,7 @@ if ($closureId > 0) {
     echo $html;
     exit;
 }
+
 /* ===========================================================
    FIN BLOQUE ADICIONAL: Reporte de Cierre
    =========================================================== */
@@ -683,6 +681,9 @@ $html .= "<div class='no-print' style='margin-top:10px; text-align:center;'>
            <button onclick='window.print()' style='padding:10px 14px;border-radius:6px;'>Imprimir</button>
            <button onclick='window.close()' style='padding:8px 12px;border-radius:6px;'>Cerrar</button>
          </div>";
+
+// --- Opción A mínima: cerrar la ventana automáticamente después de 60 segundos ---
+$html .= "<script>setTimeout(function(){try{window.close();}catch(e){}},60000);</script>";
 
 $html .= "</div>";
 $html .= "</body></html>";
