@@ -171,6 +171,26 @@ try {
 
       <a href="/mi_tienda/admin/gastos.php">Gastos</a>
       <a href="/mi_tienda/admin/gastos_list.php">Lista de Gastos</a>
+      <a href="/mi_tienda/admin/compras.php" class="btn-compras">
+          🛒 ir a Compras
+      </a>
+
+      <style>
+      .btn-compras {
+          display: inline-block;
+          padding: 8px 16px;
+          background-color: #0a6;
+          color: #ffffff;
+          text-decoration: none;
+          border-radius: 4px;
+          font-weight: bold;
+          font-family: Arial, sans-serif;
+          transition: background-color 0.2s;
+      }
+      .btn-compras:hover {
+          background-color: #085;
+      }
+</style>
 
     </p>
 

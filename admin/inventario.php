@@ -8,7 +8,7 @@ error_reporting(E_ALL);
 require_once __DIR__ . '/../includes/auth_functions.php';
 require_once __DIR__ . '/../includes/db.php';
 
-// ✅ Solo Administrador (1) o Auxiliar (4) pueden entrar
+// Solo Administrador (1) o Auxiliar (4) pueden entrar
 require_role([1, 4]);
 
 $pdo = DB::getConnection();
@@ -17,21 +17,32 @@ $msg = "";
 $action = $_GET['action'] ?? null;
 
 /* ============================================================
-   1. OBTENER SUCURSAL SELECCIONADA
+   1. OBTENER SUCURSAL Y USUARIO (Soporte Selección Dinámica)
 ============================================================ */
 
-$currentBranchId   = $_SESSION['branch_id']   ?? null;
-$currentBranchName = $_SESSION['branch_name'] ?? null;
+// Permite seleccionar la sucursal desde la URL o usa la de la sesión activa por defecto
+$currentBranchId = intval($_GET['branch_id'] ?? $_SESSION['branch_id'] ?? 0);
 
 if (!$currentBranchId) {
     die("No hay sucursal seleccionada. Vuelva al dashboard.");
 }
-if (!$currentBranchName) {
-    $currentBranchName = "Seleccionada";
+
+// Consultar nombre de la sucursal seleccionada y cargar lista completa para el selector
+$stmtB = $pdo->prepare("SELECT name FROM branches WHERE id = ?");
+$stmtB->execute([$currentBranchId]);
+$currentBranchName = $stmtB->fetchColumn() ?: ($_SESSION['branch_name'] ?? "Seleccionada");
+
+$allBranches = $pdo->query("SELECT id, name FROM branches WHERE active = 1 ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+// Lectura flexible del ID del usuario logueado
+$user_id = $_SESSION['user_id'] ?? $_SESSION['user']['id'] ?? $_SESSION['id_usuario'] ?? $_SESSION['id'] ?? null;
+
+if (!$user_id) {
+    die("Error de sesión: No se identificó el usuario actual.");
 }
 
 /* ============================================================
-   2. OBTENER PRODUCTOS
+   2. OBTENER PRODUCTOS PARA LOS SELECTS
 ============================================================ */
 
 $products = $pdo->query("
@@ -46,34 +57,46 @@ $products = $pdo->query("
 ============================================================ */
 
 if ($action === 'entrada' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    $product_id = intval($_POST['product_id']);
-    $qty        = intval($_POST['quantity']);
-    $note       = trim($_POST['note']);
+    $product_id = intval($_POST['product_id'] ?? 0);
+    $qty        = intval($_POST['quantity'] ?? 0);
+    $note       = trim($_POST['note'] ?? '');
 
-    if ($product_id && $qty > 0) {
-        // Validar que el producto existe
-        $stmtProductCheck = $pdo->prepare("SELECT id FROM products WHERE id = ?");
-        $stmtProductCheck->execute([$product_id]);
-        if ($stmtProductCheck->fetchColumn()) {
-            $stmt = $pdo->prepare("
-                INSERT INTO inventory (product_id, branch_id, quantity)
-                VALUES (?, ?, ?)
-                ON DUPLICATE KEY UPDATE quantity = quantity + VALUES(quantity)
-            ");
-            $stmt->execute([$product_id, $currentBranchId, $qty]);
+    if ($product_id > 0 && $qty > 0) {
+        try {
+            $pdo->beginTransaction();
 
-            $stmt = $pdo->prepare("
-                INSERT INTO inventory_movements (product_id, branch_id, user_id, type, quantity, note)
-                VALUES (?, ?, ?, 'entrada', ?, ?)
-            ");
-            $stmt->execute([$product_id, $currentBranchId, $_SESSION['user']['id'], $qty, $note]);
+            // Validar que el producto existe
+            $stmtProductCheck = $pdo->prepare("SELECT id FROM products WHERE id = ?");
+            $stmtProductCheck->execute([$product_id]);
+            
+            if ($stmtProductCheck->fetchColumn()) {
+                // Actualizar o Insertar Stock
+                $stmt = $pdo->prepare("
+                    INSERT INTO inventory (product_id, branch_id, quantity)
+                    VALUES (?, ?, ?)
+                    ON DUPLICATE KEY UPDATE quantity = quantity + VALUES(quantity)
+                ");
+                $stmt->execute([$product_id, $currentBranchId, $qty]);
 
-            $msg = "Entrada registrada correctamente.";
-        } else {
-            $msg = "El producto no existe.";
+                // Registrar Historial de Movimiento
+                $stmtMov = $pdo->prepare("
+                    INSERT INTO inventory_movements (product_id, branch_id, user_id, type, quantity, note)
+                    VALUES (?, ?, ?, 'entrada', ?, ?)
+                ");
+                $stmtMov->execute([$product_id, $currentBranchId, $user_id, $qty, $note]);
+
+                $pdo->commit();
+                $msg = "Entrada registrada correctamente.";
+            } else {
+                $pdo->rollBack();
+                $msg = "El producto no existe.";
+            }
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            $msg = "Error al registrar la entrada: " . $e->getMessage();
         }
     } else {
-        $msg = "Todos los campos son obligatorios.";
+        $msg = "Todos los campos obligatorios deben ser válidos.";
     }
 }
 
@@ -82,32 +105,41 @@ if ($action === 'entrada' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 ============================================================ */
 
 if ($action === 'salida' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    $product_id = intval($_POST['product_id']);
-    $qty        = intval($_POST['quantity']);
-    $note       = trim($_POST['note']);
+    $product_id = intval($_POST['product_id'] ?? 0);
+    $qty        = intval($_POST['quantity'] ?? 0);
+    $note       = trim($_POST['note'] ?? '');
 
-    if ($product_id && $qty > 0) {
-        $stmt = $pdo->prepare("SELECT quantity FROM inventory WHERE product_id=? AND branch_id=?");
-        $stmt->execute([$product_id, $currentBranchId]);
-        $stock = $stmt->fetchColumn();
+    if ($product_id > 0 && $qty > 0) {
+        try {
+            $pdo->beginTransaction();
 
-        if ($stock === false || $stock < $qty) {
-            $msg = "No hay suficiente stock para realizar la salida.";
-        } else {
-            $stmt = $pdo->prepare("
-                UPDATE inventory 
-                SET quantity = quantity - ? 
-                WHERE product_id=? AND branch_id=?
-            ");
-            $stmt->execute([$qty, $product_id, $currentBranchId]);
+            $stmt = $pdo->prepare("SELECT quantity FROM inventory WHERE product_id=? AND branch_id=?");
+            $stmt->execute([$product_id, $currentBranchId]);
+            $stock = $stmt->fetchColumn();
 
-            $stmt = $pdo->prepare("
-                INSERT INTO inventory_movements (product_id, branch_id, user_id, type, quantity, note)
-                VALUES (?, ?, ?, 'salida', ?, ?)
-            ");
-            $stmt->execute([$product_id, $currentBranchId, $_SESSION['user']['id'], $qty, $note]);
+            if ($stock === false || $stock < $qty) {
+                $pdo->rollBack();
+                $msg = "No hay suficiente stock disponible para realizar la salida.";
+            } else {
+                $stmt = $pdo->prepare("
+                    UPDATE inventory 
+                    SET quantity = quantity - ? 
+                    WHERE product_id=? AND branch_id=?
+                ");
+                $stmt->execute([$qty, $product_id, $currentBranchId]);
 
-            $msg = "Salida registrada correctamente.";
+                $stmtMov = $pdo->prepare("
+                    INSERT INTO inventory_movements (product_id, branch_id, user_id, type, quantity, note)
+                    VALUES (?, ?, ?, 'salida', ?, ?)
+                ");
+                $stmtMov->execute([$product_id, $currentBranchId, $user_id, $qty, $note]);
+
+                $pdo->commit();
+                $msg = "Salida registrada correctamente.";
+            }
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            $msg = "Error al registrar la salida: " . $e->getMessage();
         }
     } else {
         $msg = "Todos los campos son obligatorios.";
@@ -115,7 +147,7 @@ if ($action === 'salida' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 /* ============================================================
-   4.b PROCESAR ACTUALIZACIÓN MASIVA DE INVENTARIO (Opción B)
+   4.b PROCESAR ACTUALIZACIÓN MASIVA DE INVENTARIO
 ============================================================ */
 
 if ($action === 'actualizarMasivo' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -126,10 +158,10 @@ if ($action === 'actualizarMasivo' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->beginTransaction();
         try {
             $stmtProductCheck = $pdo->prepare("SELECT id FROM products WHERE id = ?");
-            $stmtCheck = $pdo->prepare("SELECT id FROM inventory WHERE product_id = ? AND branch_id = ?");
-            $updateStmt = $pdo->prepare("UPDATE inventory SET quantity = ? WHERE id = ? AND branch_id = ?");
-            $insertStmt = $pdo->prepare("INSERT INTO inventory (product_id, branch_id, quantity) VALUES (?, ?, ?)");
-            $movementStmt = $pdo->prepare("
+            $stmtCheck        = $pdo->prepare("SELECT id, quantity FROM inventory WHERE product_id = ? AND branch_id = ?");
+            $updateStmt       = $pdo->prepare("UPDATE inventory SET quantity = ? WHERE id = ? AND branch_id = ?");
+            $insertStmt       = $pdo->prepare("INSERT INTO inventory (product_id, branch_id, quantity) VALUES (?, ?, ?)");
+            $movementStmt     = $pdo->prepare("
                 INSERT INTO inventory_movements (product_id, branch_id, user_id, type, quantity, note)
                 VALUES (?, ?, ?, 'ajuste', ?, ?)
             ");
@@ -139,24 +171,25 @@ if ($action === 'actualizarMasivo' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 $newQty = intval($newQty);
                 if ($productId <= 0 || $newQty < 0) continue;
 
-                // Validar que el producto existe
                 $stmtProductCheck->execute([$productId]);
                 if (!$stmtProductCheck->fetchColumn()) {
-                    continue; // saltar si no existe
+                    continue;
                 }
 
-                // Verificar si ya existe fila en inventory
                 $stmtCheck->execute([$productId, $currentBranchId]);
                 $row = $stmtCheck->fetch(PDO::FETCH_ASSOC);
 
                 if ($row) {
-                    $updateStmt->execute([$newQty, $row['id'], $currentBranchId]);
+                    if (intval($row['quantity']) !== $newQty) {
+                        $updateStmt->execute([$newQty, $row['id'], $currentBranchId]);
+                        $note = "Ajuste masivo por usuario ID: " . $user_id;
+                        $movementStmt->execute([$productId, $currentBranchId, $user_id, $newQty, $note]);
+                    }
                 } else {
                     $insertStmt->execute([$productId, $currentBranchId, $newQty]);
+                    $note = "Registro inicial masivo por usuario ID: " . $user_id;
+                    $movementStmt->execute([$productId, $currentBranchId, $user_id, $newQty, $note]);
                 }
-
-                $note = "Ajuste masivo por usuario " . ($_SESSION['user']['id'] ?? '0');
-                $movementStmt->execute([$productId, $currentBranchId, $_SESSION['user']['id'], $newQty, $note]);
             }
 
             $pdo->commit();
@@ -169,19 +202,36 @@ if ($action === 'actualizarMasivo' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 /* ============================================================
-   PAGINACIÓN (servidor) - Opción B
+   5. PAGINACIÓN Y CONSULTA DE INVENTARIO (CON BÚSQUEDA PHP)
 ============================================================ */
+
+$search = trim($_GET['search'] ?? '');
 
 $page = max(1, intval($_GET['page'] ?? 1));
 $perPage = 50;
 $offset = ($page - 1) * $perPage;
 
-$stmtCount = $pdo->prepare("SELECT COUNT(*) FROM products WHERE active = 1");
-$stmtCount->execute();
+// Construir condición de búsqueda SQL
+$whereClause = "WHERE p.active = 1";
+$paramsCount = [];
+$paramsSelect = [$currentBranchId];
+
+if ($search !== '') {
+    $whereClause .= " AND (p.name LIKE ? OR p.sku LIKE ?)";
+    $paramsCount[] = "%$search%";
+    $paramsCount[] = "%$search%";
+    $paramsSelect[] = "%$search%";
+    $paramsSelect[] = "%$search%";
+}
+
+// Conteo total con filtro
+$stmtCount = $pdo->prepare("SELECT COUNT(*) FROM products p $whereClause");
+$stmtCount->execute($paramsCount);
 $total = intval($stmtCount->fetchColumn());
 $totalPages = max(1, (int) ceil($total / $perPage));
 
-$stmt = $pdo->prepare("
+// Consulta principal
+$sql = "
     SELECT 
         p.id AS product_id,
         p.name AS product_name,
@@ -191,13 +241,20 @@ $stmt = $pdo->prepare("
         COALESCE(i.min_quantity, 0) AS min_quantity
     FROM products p
     LEFT JOIN inventory i ON i.product_id = p.id AND i.branch_id = ?
-    WHERE p.active = 1
+    $whereClause
     ORDER BY p.name
     LIMIT ? OFFSET ?
-");
-$stmt->bindValue(1, $currentBranchId, PDO::PARAM_INT);
-$stmt->bindValue(2, $perPage, PDO::PARAM_INT);
-$stmt->bindValue(3, $offset, PDO::PARAM_INT);
+";
+
+$stmt = $pdo->prepare($sql);
+
+$paramIndex = 1;
+foreach ($paramsSelect as $val) {
+    $stmt->bindValue($paramIndex++, $val, PDO::PARAM_STR);
+}
+$stmt->bindValue($paramIndex++, $perPage, PDO::PARAM_INT);
+$stmt->bindValue($paramIndex++, $offset, PDO::PARAM_INT);
+
 $stmt->execute();
 $inventory = $stmt->fetchAll();
 
@@ -214,28 +271,28 @@ function buildPageUrl($pageNumber) {
 <title>Inventario - Mi Tienda</title>
 <style>
     body { font-family: Arial; background:#f4f4f4; margin:0; padding:0; }
-    header { background:#0a6; color:#fff; padding:12px 20px; }
+    header { background:#0a6; color:#fff; padding:12px 20px; display:flex; justify-between; align-items:center; }
+    header h2 { margin:0; }
     .container { max-width:1100px; margin:20px auto; background:#fff; padding:20px; border-radius:8px; }
     table { width:100%; border-collapse:collapse; margin-top:20px; }
     th, td { padding:10px; border-bottom:1px solid #ddd; }
     th { background:#eee; text-align:left; }
-    .msg { background:#dff0d8; padding:10px; border-radius:6px; margin-bottom:10px; }
-    .error { background:#f8d7da; padding:10px; border-radius    .error { background:#f8d7da; padding:10px; border-radius:6px; margin-bottom:10px; }
+    .msg { background:#dff0d8; color:#3c763d; padding:10px; border-radius:6px; margin-bottom:10px; font-weight:bold; }
+    .error { background:#f8d7da; color:#721c24; padding:10px; border-radius:6px; margin-bottom:10px; }
     form { margin-top:20px; background:#fafafa; padding:15px; border-radius:6px; }
     input, select, textarea { width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box; }
     button { padding:8px 12px; background:#0a6; color:#fff; border:none; border-radius:4px; cursor:pointer; }
     h3 { margin-top:30px; }
-    .top-actions { display:flex; gap:10px; margin-bottom:10px; align-items:center; }
+    .top-actions { display:flex; gap:10px; margin-bottom:10px; align-items:center; flex-wrap:wrap; }
     .top-actions button, .top-actions .small-btn { padding:8px 10px; }
-    .small-btn { background:#eee; border:1px solid #ccc; cursor:pointer; border-radius:4px; }
-    input[type="number"].inline-qty { width:120px; }
+    .small-btn { background:#eee; border:1px solid #ccc; cursor:pointer; border-radius:4px; text-decoration:none; color:#333; display:inline-block; }
     .editable-input { width:100%; box-sizing:border-box; padding:6px; }
     nav.pager { margin-top:12px; }
     nav.pager a { margin-right:8px; text-decoration:none; color:#0a6; }
     nav.pager a.current { font-weight:bold; color:#000; }
     .table-scroll { max-height:520px; overflow:auto; border:1px solid #eee; padding:6px; border-radius:6px; }
+    .branch-selector { background:#fff; color:#333; font-weight:bold; padding:6px 12px; border-radius:4px; border:1px solid #ccc; width:auto; margin:0; }
 </style>
-<!-- ✅ Select2 CSS -->
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0/dist/css/select2.min.css" rel="stylesheet" />
 </head>
 <body>
@@ -251,16 +308,34 @@ function buildPageUrl($pageNumber) {
 <?php endif; ?>
 
 <div class="top-actions">
-  <!-- Buscador global -->
-  <input type="text" id="searchInventory" placeholder="Buscar producto o SKU..." style="flex:1; padding:8px;">
-  <!-- Botón exportar CSV -->
+  <!-- Selector Dinámico de Sucursal -->
+  <form method="GET" style="margin:0; background:none; padding:0; display:inline-flex; align-items:center; gap:5px;">
+      <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
+      <label style="font-weight:bold;">Sucursal:</label>
+      <select name="branch_id" onchange="this.form.submit()" class="branch-selector">
+          <?php foreach ($allBranches as $b): ?>
+              <option value="<?= $b['id'] ?>" <?= $b['id'] == $currentBranchId ? 'selected' : '' ?>>
+                  <?= htmlspecialchars($b['name']) ?>
+              </option>
+          <?php endforeach; ?>
+      </select>
+  </form>
+
+  <!-- Buscador en tiempo real por Servidor (GET) -->
+  <form method="GET" style="margin:0; background:none; padding:0; flex:1; display:flex; gap:5px;">
+      <input type="hidden" name="branch_id" value="<?= $currentBranchId ?>">
+      <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Buscar producto o SKU en todo el inventario..." style="margin:0;">
+      <button type="submit">Buscar</button>
+      <?php if ($search !== ''): ?>
+          <a href="/mi_tienda/admin/inventario.php?branch_id=<?= $currentBranchId ?>" class="small-btn">Limpiar</a>
+      <?php endif; ?>
+  </form>
+
   <button type="button" onclick="exportTableToCSV('inventario_<?= date('Ymd_His') ?>.csv')">Descargar Inventario</button>
-  <!-- Botón para limpiar filtro -->
-  <button type="button" class="small-btn" id="clearFilter">Limpiar</button>
 </div>
 
 <h3>Registrar Entrada de Inventario</h3>
-<form method="POST" action="/mi_tienda/admin/inventario.php?action=entrada">
+<form method="POST" action="/mi_tienda/admin/inventario.php?action=entrada&branch_id=<?= $currentBranchId ?>&search=<?= urlencode($search) ?>">
     <label for="entrada-product">Producto</label>
     <select id="entrada-product" name="product_id" required>
         <option value="">Seleccione producto</option>
@@ -272,11 +347,11 @@ function buildPageUrl($pageNumber) {
     <input type="number" name="quantity" placeholder="Cantidad" min="1" required>
     <textarea name="note" placeholder="Nota (opcional)"></textarea>
 
-    <button>Registrar Entrada</button>
+    <button type="submit">Registrar Entrada</button>
 </form>
 
 <h3>Registrar Salida de Inventario</h3>
-<form method="POST" action="/mi_tienda/admin/inventario.php?action=salida">
+<form method="POST" action="/mi_tienda/admin/inventario.php?action=salida&branch_id=<?= $currentBranchId ?>&search=<?= urlencode($search) ?>">
     <label for="salida-product">Producto</label>
     <select id="salida-product" name="product_id" required>
         <option value="">Seleccione producto</option>
@@ -288,13 +363,12 @@ function buildPageUrl($pageNumber) {
     <input type="number" name="quantity" placeholder="Cantidad" min="1" required>
     <textarea name="note" placeholder="Nota (opcional)"></textarea>
 
-    <button>Registrar Salida</button>
+    <button type="submit">Registrar Salida</button>
 </form>
 
 <h3>Inventario Actual (Catálogo completo)</h3>
 
-<!-- Formulario para edición masiva -->
-<form method="POST" action="/mi_tienda/admin/inventario.php?action=actualizarMasivo" id="massUpdateForm">
+<form method="POST" action="/mi_tienda/admin/inventario.php?action=actualizarMasivo&branch_id=<?= $currentBranchId ?>&search=<?= urlencode($search) ?>" id="massUpdateForm">
 
 <div class="table-scroll">
 <table id="inventoryTable">
@@ -307,18 +381,23 @@ function buildPageUrl($pageNumber) {
         </tr>
     </thead>
     <tbody>
-        <?php foreach ($inventory as $i): ?>
+        <?php if (empty($inventory)): ?>
         <tr>
-            <td><?= htmlspecialchars($i['product_name']) ?></td>
-            <td><?= htmlspecialchars($i['sku']) ?></td>
-            <td>
-                <!-- Usamos product_id como clave para facilitar inserciones si no existe inventory -->
-                <input class="editable-input" type="number" name="quantities[<?= intval($i['product_id']) ?>]" 
-                       value="<?= intval($i['quantity']) ?>" min="0" step="1">
-            </td>
-            <td><?= intval($i['min_quantity']) ?></td>
+            <td colspan="4" style="text-align:center;">No se encontraron productos que coincidan con la búsqueda.</td>
         </tr>
-        <?php endforeach; ?>
+        <?php else: ?>
+            <?php foreach ($inventory as $i): ?>
+            <tr>
+                <td><?= htmlspecialchars($i['product_name']) ?></td>
+                <td><?= htmlspecialchars($i['sku']) ?></td>
+                <td>
+                    <input class="editable-input" type="number" name="quantities[<?= intval($i['product_id']) ?>]" 
+                           value="<?= intval($i['quantity']) ?>" min="0" step="1">
+                </td>
+                <td><?= intval($i['min_quantity']) ?></td>
+            </tr>
+            <?php endforeach; ?>
+        <?php endif; ?>
     </tbody>
 </table>
 </div>
@@ -328,7 +407,6 @@ function buildPageUrl($pageNumber) {
 </div>
 </form>
 
-<!-- PAGINACIÓN -->
 <?php if ($totalPages > 1): ?>
   <nav class="pager" aria-label="Paginación inventario">
     <?php if ($page > 1): ?>
@@ -336,7 +414,6 @@ function buildPageUrl($pageNumber) {
     <?php endif; ?>
 
     <?php
-      // Mostrar un rango razonable de páginas (ej: -2..+2)
       $start = max(1, $page - 2);
       $end = min($totalPages, $page + 2);
       if ($start > 1) {
@@ -361,32 +438,16 @@ function buildPageUrl($pageNumber) {
 
 </div>
 
-<!-- ✅ jQuery y Select2 JS -->
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0/dist/js/select2.min.js"></script>
 
 <script>
   $(document).ready(function() {
-    // activar Select2 en selects de entrada/salida
     $('#entrada-product, #salida-product').select2({
       placeholder: "Buscar producto...",
       width: '100%'
     });
 
-    // Buscador en la tabla (filtrado por texto)
-    $("#searchInventory").on("keyup", function() {
-      var value = $(this).val().toLowerCase();
-      $("#inventoryTable tbody tr").filter(function() {
-        $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
-      });
-    });
-
-    // Limpiar filtro
-    $("#clearFilter").on("click", function() {
-      $("#searchInventory").val('').trigger('keyup');
-    });
-
-    // Confirmación antes de enviar actualización masiva (opcional)
     $("#massUpdateForm").on("submit", function(e) {
       if (!confirm("¿Deseas guardar los cambios masivos en el inventario? Esta acción registrará ajustes para cada producto modificado.")) {
         e.preventDefault();
@@ -394,14 +455,12 @@ function buildPageUrl($pageNumber) {
     });
   });
 
-  // Función para exportar tabla a CSV (cliente)
   function exportTableToCSV(filename) {
     var csv = [];
     var rows = document.querySelectorAll("#inventoryTable tr");
     for (var i = 0; i < rows.length; i++) {
       var row = [], cols = rows[i].querySelectorAll("td, th");
       for (var j = 0; j < cols.length; j++) {
-        // Reemplazar comas internas y saltos de línea
         var text = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, " ").replace(/,/g, "");
         row.push('"' + text.trim() + '"');
       }

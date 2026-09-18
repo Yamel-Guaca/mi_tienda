@@ -97,7 +97,7 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $name   = trim($_POST['name']);
     $sku    = trim($_POST['sku']);
     $price  = (float)($_POST['price'] ?? 0);
-    $min_q  = (int)($_POST['min_quantity'] ?? 0);
+    $min_q  = max(0, (int)($_POST['min_quantity'] ?? 0));
     $cat_id = (int)($_POST['category_id'] ?? 0);
     $sub_id = (int)($_POST['subcategory_id'] ?? 0);
     $active = 1;
@@ -116,49 +116,83 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     // ✅ Nuevo campo rounding_enabled
     $rounding_enabled = isset($_POST['rounding_enabled']) ? (int)$_POST['rounding_enabled'] : 1;
 
+    // Branch minimums (array expected: branch_minimums[<branch_id>] = <min_quantity>)
+    $branch_minimums_input = $_POST['branch_minimums'] ?? [];
+
     if ($name && $sku && $price_unit > 0 && $cat_id > 0 && $sub_id > 0) {
-        $stmt = $pdo->prepare("
-            INSERT INTO products 
-            (name, sku, price, min_quantity, category_id, subcategory_id, active,
-             cost_initial, packaging_type, packaging_qty, iva_percent, margin_percent, price_unit, rounding_enabled)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        $stmt->execute([$name, $sku, $price_unit, $min_q, $cat_id, $sub_id, $active,
-            $cost_initial, $packaging_type, $packaging_qty, $iva_percent, $margin_percent, $price_unit, $rounding_enabled]);
+        try {
+            // Opcional: envolver en transacción para consistencia
+            $pdo->beginTransaction();
 
-        $new_id = (int)$pdo->lastInsertId();
+            $stmt = $pdo->prepare("
+                INSERT INTO products 
+                (name, sku, price, min_quantity, category_id, subcategory_id, active,
+                 cost_initial, packaging_type, packaging_qty, iva_percent, margin_percent, price_unit, rounding_enabled)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $name, $sku, $price_unit, $min_q, $cat_id, $sub_id, $active,
+                $cost_initial, $packaging_type, $packaging_qty, $iva_percent, $margin_percent, $price_unit, $rounding_enabled
+            ]);
 
-        if (!empty($_FILES['images']['name'][0])) {
-            save_product_images($new_id, $_FILES['images'], $pdo);
-        }
+            $new_id = (int)$pdo->lastInsertId();
 
-        // Guardar price tiers
-        $price_tiers_json = $_POST['price_tiers_json'] ?? '';
-        if ($price_tiers_json) {
-            $tiers = json_decode($price_tiers_json, true);
-            if (is_array($tiers)) {
-                $stmtDel = $pdo->prepare("DELETE FROM product_prices WHERE product_id=?");
-                $stmtDel->execute([$new_id]);
-                $stmtIns = $pdo->prepare("INSERT INTO product_prices (product_id, unit_label, quantity, price, margin_percent, category_id, subcategory_id, iva_percent) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-                foreach ($tiers as $t) {
-                    $t_label = $t['label'] ?? '';
-                    $t_qty = intval($t['quantity'] ?? 1);
-                    $t_margin = isset($t['margin']) ? floatval($t['margin']) : 0.0;
-                    $t_price = isset($t['price']) ? floatval($t['price']) : 0.0;
-                    if ($t_price <= 0) {
-                        $t_price = calculate_price_from_margin($cost_initial, $packaging_qty, $iva_percent, $t_margin, (bool)$rounding_enabled);
-                    }
-                    $t_category = !empty($t['category_id']) ? intval($t['category_id']) : null;
-                    $t_subcategory = !empty($t['subcategory_id']) ? intval($t['subcategory_id']) : null;
-                    $t_iva = isset($t['iva_percent']) ? floatval($t['iva_percent']) : 0.0;
+            // Guardar imágenes
+            if (!empty($_FILES['images']['name'][0])) {
+                save_product_images($new_id, $_FILES['images'], $pdo);
+            }
 
-                    $stmtIns->execute([$new_id, $t_label, $t_qty, $t_price, $t_margin, $t_category, $t_subcategory, $t_iva]);
+            // Guardar mínimos por sucursal (si vienen)
+            if (is_array($branch_minimums_input) && count($branch_minimums_input) > 0) {
+                $stmtMin = $pdo->prepare("
+                    INSERT INTO product_branch_minimums (product_id, branch_id, min_quantity)
+                    VALUES (?, ?, ?)
+                    ON DUPLICATE KEY UPDATE min_quantity = VALUES(min_quantity)
+                ");
+                foreach ($branch_minimums_input as $branch_id => $min_val) {
+                    $b_id = (int)$branch_id;
+                    $min_q_branch = max(0, (int)$min_val);
+                    // Ignorar branch_id inválidos
+                    if ($b_id <= 0) continue;
+                    $stmtMin->execute([$new_id, $b_id, $min_q_branch]);
                 }
             }
-        }
 
-        $msg = "Producto creado correctamente.";
-        $action = null;
+            // Guardar price tiers
+            $price_tiers_json = $_POST['price_tiers_json'] ?? '';
+            if ($price_tiers_json) {
+                $tiers = json_decode($price_tiers_json, true);
+                if (is_array($tiers)) {
+                    $stmtDel = $pdo->prepare("DELETE FROM product_prices WHERE product_id=?");
+                    $stmtDel->execute([$new_id]);
+                    $stmtIns = $pdo->prepare("INSERT INTO product_prices (product_id, unit_label, quantity, price, margin_percent, category_id, subcategory_id, iva_percent) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                    foreach ($tiers as $t) {
+                        $t_label = $t['label'] ?? '';
+                        $t_qty = max(1, intval($t['quantity'] ?? 1));
+                        $t_margin = isset($t['margin']) ? floatval($t['margin']) : 0.0;
+                        $t_price = isset($t['price']) ? floatval($t['price']) : 0.0;
+                        if ($t_price <= 0) {
+                            $t_price = calculate_price_from_margin($cost_initial, $packaging_qty, $iva_percent, $t_margin, (bool)$rounding_enabled);
+                        }
+                        $t_category = !empty($t['category_id']) ? intval($t['category_id']) : null;
+                        $t_subcategory = !empty($t['subcategory_id']) ? intval($t['subcategory_id']) : null;
+                        $t_iva = isset($t['iva_percent']) ? floatval($t['iva_percent']) : 0.0;
+
+                        $stmtIns->execute([$new_id, $t_label, $t_qty, $t_price, $t_margin, $t_category, $t_subcategory, $t_iva]);
+                    }
+                }
+            }
+
+            $pdo->commit();
+
+            $msg = "Producto creado correctamente.";
+            $action = null;
+        } catch (Exception $e) {
+            // Rollback y mensaje de error (no exponer detalles sensibles)
+            try { $pdo->rollBack(); } catch (Exception $e2) {}
+            error_log("Error creando producto: " . $e->getMessage());
+            $msg = "Ocurrió un error al crear el producto. Intente nuevamente.";
+        }
     } else {
         $msg = "Todos los campos obligatorios deben estar completos.";
     }
@@ -204,6 +238,30 @@ if ($action === 'edit' && $_SERVER['REQUEST_METHOD'] === 'POST' && $id) {
             save_product_images($id, $_FILES['images'], $pdo);
         }
 
+        // Guardar mínimos por sucursal (si vienen)
+        $branch_minimums_input = $_POST['branch_minimums'] ?? [];
+        if (is_array($branch_minimums_input) && count($branch_minimums_input) > 0) {
+            try {
+                // Usamos INSERT ... ON DUPLICATE KEY UPDATE para insertar o actualizar
+                // Asegúrate de tener UNIQUE(product_id, branch_id) en la tabla product_branch_minimums
+                $stmtMin = $pdo->prepare("
+                    INSERT INTO product_branch_minimums (product_id, branch_id, min_quantity)
+                    VALUES (?, ?, ?)
+                    ON DUPLICATE KEY UPDATE min_quantity = VALUES(min_quantity)
+                ");
+                foreach ($branch_minimums_input as $branch_id => $min_val) {
+                    $b_id = (int)$branch_id;
+                    $min_q_branch = max(0, (int)$min_val);
+                    if ($b_id <= 0) continue;
+                    $stmtMin->execute([$id, $b_id, $min_q_branch]);
+                }
+            } catch (Exception $e) {
+                // Registrar error pero no interrumpir la actualización principal
+                error_log("Error guardando mínimos por sucursal (edit): " . $e->getMessage());
+                $msg .= " (Error guardando mínimos por sucursal)";
+            }
+        }
+
         // Guardar price tiers
         $price_tiers_json = $_POST['price_tiers_json'] ?? '';
         if ($price_tiers_json) {
@@ -234,6 +292,7 @@ if ($action === 'edit' && $_SERVER['REQUEST_METHOD'] === 'POST' && $id) {
         $msg = "Todos los campos obligatorios deben estar completos.";
     }
 }
+
 // ============================================================
 // 2.5 CARGAR DATOS PARA EDICIÓN Y LISTADO
 // ============================================================
@@ -251,7 +310,25 @@ if ($action === 'edit' && $id) {
     $stmtTiers = $pdo->prepare("SELECT * FROM product_prices WHERE product_id=?");
     $stmtTiers->execute([$id]);
     $edit_price_tiers = $stmtTiers->fetchAll(PDO::FETCH_ASSOC);
+
+    // Cargar mínimos por sucursal para prellenar el formulario (branch_id => min_quantity)
+    $stmtMin = $pdo->prepare("SELECT branch_id, min_quantity FROM product_branch_minimums WHERE product_id = ?");
+    $stmtMin->execute([$id]);
+    $branchMinimums = $stmtMin->fetchAll(PDO::FETCH_KEY_PAIR);
+    if (!is_array($branchMinimums)) {
+        // Fallback si FETCH_KEY_PAIR no está disponible o devuelve false
+        $branchMinimums = [];
+        $stmtMin->execute([$id]);
+        while ($row = $stmtMin->fetch(PDO::FETCH_ASSOC)) {
+            $branchMinimums[(int)$row['branch_id']] = (int)$row['min_quantity'];
+        }
+    }
+
+    // Asegurarse de tener la lista de sucursales para renderizar los inputs
+    // (si ya cargaste $branches en otra parte del script, esta consulta es redundante)
+    $branches = $pdo->query("SELECT id, name FROM branches ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
 }
+
 
 // Siempre cargar la lista de productos para la tabla final
 $products = $pdo->query("
@@ -337,7 +414,7 @@ $nextSku = $lastSku > 0 ? $lastSku + 1 : 100;
     <input type="text" name="name" placeholder="Nombre del producto" required>
     <input type="text" name="sku" id="sku" value="<?= $nextSku ?>" readonly required>
     <input type="number" step="0.01" name="price" id="price_field" placeholder="Precio" readonly required>
-    <input type="number" name="min_quantity" placeholder="Cantidad mínima (opcional)">
+    <input type="number" name="min_quantity" placeholder="Cantidad mínima (opcional)" min="0">
 
     <label>Categoría:</label>
     <select name="category_id" id="category_select" required>
@@ -396,7 +473,6 @@ $nextSku = $lastSku > 0 ? $lastSku + 1 : 100;
       </button>
     </div>
 
-    
     <h4>Precios por presentación</h4>
     <div id="price-tiers-editor">
       <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
@@ -444,18 +520,65 @@ $nextSku = $lastSku > 0 ? $lastSku + 1 : 100;
       <input type="hidden" id="price_tiers_json" name="price_tiers_json" value="">
     </div>
 
+    <!-- ======= Nuevo bloque: Cantidad mínima por sucursal ======= -->
+    <h4>Cantidad mínima por sucursal</h4>
+
+    <?php if (!empty($branches)): ?>
+      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;">
+        <?php foreach ($branches as $b): ?>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <label style="min-width:180px; margin:0; font-weight:600;"><?= htmlspecialchars($b['name']) ?></label>
+            <input type="number"
+                   name="branch_minimums[<?= (int)$b['id'] ?>]"
+                   value="<?= 0 ?>"
+                   min="0"
+                   style="width:140px; padding:6px; border:1px solid #ddd; border-radius:6px;">
+            <span class="small" style="opacity:0.8;">(Dejar 0 para usar el mínimo global)</span>
+          </div>
+        <?php endforeach; ?>
+      </div>
+    <?php else: ?>
+      <p class="small">No se encontraron sucursales.</p>
+    <?php endif; ?>
+
     <button class="btn btn-create">Guardar</button>
 </form>
+
 <?php endif; ?>
 
 <?php if ($action === 'edit' && $edit_product): ?>
-    <h3>Editar Producto: <?= htmlspecialchars($edit_product['name']) ?></h3>
-    <form method="POST" action="/mi_tienda/admin/productos.php?action=edit&id=<?= $edit_product['id'] ?>" enctype="multipart/form-data">
+  <h3>Editar Producto: <?= htmlspecialchars($edit_product['name']) ?></h3>
+      <form method="POST" action="/mi_tienda/admin/productos.php?action=edit&id=<?= $edit_product['id'] ?>" enctype="multipart/form-data">
         <input type="text" name="name" value="<?= htmlspecialchars($edit_product['name']) ?>" required>
         <input type="text" name="sku" value="<?= htmlspecialchars($edit_product['sku']) ?>" required>
         <input type="number" step="0.01" name="price" id="price_field" value="<?= htmlspecialchars($edit_product['price']) ?>" readonly required>
 
         <input type="number" name="min_quantity" value="<?= htmlspecialchars($edit_product['min_quantity']) ?>">
+
+        <!-- ======= Bloque: Cantidad mínima por sucursal (EDICIÓN) ======= -->
+        <h4>Cantidad mínima por sucursal</h4>
+
+        <?php if (!empty($branches)): ?>
+          <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;">
+            <?php foreach ($branches as $b):
+                $bId = (int)$b['id'];
+                $val = isset($branchMinimums[$bId]) ? (int)$branchMinimums[$bId] : (int)($edit_product['min_quantity'] ?? 0);
+            ?>
+              <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <label style="min-width:180px; margin:0; font-weight:600;"><?= htmlspecialchars($b['name']) ?></label>
+                <input type="number"
+                       name="branch_minimums[<?= $bId ?>]"
+                       value="<?= htmlspecialchars($val) ?>"
+                       min="0"
+                       style="width:140px; padding:6px; border:1px solid #ddd; border-radius:6px;">
+                <span class="small" style="opacity:0.8;">(0 usa el mínimo global)</span>
+              </div>
+            <?php endforeach; ?>
+          </div>
+        <?php else: ?>
+          <p class="small">No se encontraron sucursales.</p>
+        <?php endif; ?>
+        <!-- ======= Fin bloque ======= -->
 
         <label>Categoría:</label>
         <select name="category_id" id="category_select_edit" required>
@@ -539,62 +662,62 @@ $nextSku = $lastSku > 0 ? $lastSku + 1 : 100;
         </script>
 
         <h4>Precios por presentación</h4>
-<div id="price-tiers-editor">
-  <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
-    <select id="tier_label">
-      <option value="unidad">Unidad</option>
-      <option value="docena">Docena</option>
-      <option value="caja">Caja</option>
-      <option value="paca">Paca</option>
-      <option value="otro">Otro</option>
-    </select>
+          <div id="price-tiers-editor">
+            <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
+              <select id="tier_label">
+                <option value="unidad">Unidad</option>
+                <option value="docena">Docena</option>
+                <option value="caja">Caja</option>
+                <option value="paca">Paca</option>
+                <option value="otro">Otro</option>
+              </select>
 
-    <input type="text" id="tier_label_custom" placeholder="Etiqueta personalizada (opcional)" style="min-width:160px;">
+              <input type="text" id="tier_label_custom" placeholder="Etiqueta personalizada (opcional)" style="min-width:160px;">
 
-    <input id="tier_qty" type="number" min="1" value="1" style="width:100px;" placeholder="Cantidad">
+              <input id="tier_qty" type="number" min="1" value="1" style="width:100px;" placeholder="Cantidad">
 
-    <input id="tier_price" type="number" step="0.01" placeholder="Precio (opcional)" style="width:120px;">
+              <input id="tier_price" type="number" step="0.01" placeholder="Precio (opcional)" style="width:120px;">
 
-    <input id="tier_margin" type="number" step="0.01" placeholder="Margen % (opcional)" style="width:100px;">
+              <input id="tier_margin" type="number" step="0.01" placeholder="Margen % (opcional)" style="width:100px;">
 
-    <select id="tier_category" style="min-width:140px;">
-      <option value="">Seleccione categoría</option>
-      <?php foreach ($categories as $c): ?>
-        <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['name']) ?></option>
-      <?php endforeach; ?>
-    </select>
+              <select id="tier_category" style="min-width:140px;">
+                <option value="">Seleccione categoría</option>
+                <?php foreach ($categories as $c): ?>
+                  <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['name']) ?></option>
+                <?php endforeach; ?>
+              </select>
 
-    <select id="tier_subcategory" style="min-width:140px;">
-      <option value="">Seleccione subcategoría</option>
-    </select>
+              <select id="tier_subcategory" style="min-width:140px;">
+                <option value="">Seleccione subcategoría</option>
+              </select>
 
-    <input id="tier_iva" type="number" step="0.01" placeholder="IVA %" style="width:80px;">
+              <input id="tier_iva" type="number" step="0.01" placeholder="IVA %" style="width:80px;">
 
-    <button type="button" class="btn" onclick="addPriceTier()">Agregar</button>
-  </div>
+              <button type="button" class="btn" onclick="addPriceTier()">Agregar</button>
+            </div>
 
-  <table id="price-tiers" style="width:100%; border-collapse:collapse;">
-    <thead>
-      <tr>
-        <th>Pertenece a:</th>
-        <th>Etiqueta</th>
-        <th>Cantidad</th>
-        <th>Precio</th>
-        <th>Margen %</th>
-        <th>Categoría</th>
-        <th>Subcategoría</th>
-        <th>IVA %</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+            <table id="price-tiers" style="width:100%; border-collapse:collapse;">
+              <thead>
+                <tr>
+                  <th>Pertenece a:</th>
+                  <th>Etiqueta</th>
+                  <th>Cantidad</th>
+                  <th>Precio</th>
+                  <th>Margen %</th>
+                  <th>Categoría</th>
+                  <th>Subcategoría</th>
+                  <th>IVA %</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
 
-  <input type="hidden" id="price_tiers_json" name="price_tiers_json" value="">
-</div>
+            <input type="hidden" id="price_tiers_json" name="price_tiers_json" value="">
+          </div>
 
         <button class="btn btn-create">Actualizar</button>
-    </form>
+      </form>
 
     <h3>Galería de Imágenes</h3>
     <?php if ($edit_images): ?>

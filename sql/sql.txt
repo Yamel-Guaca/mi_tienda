@@ -1,0 +1,102 @@
+------se creo el gasto en la base de datos
+
+ya esta en la base de datos
+
+CREATE TABLE gastos (
+  id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  usuario_id INT NOT NULL,
+  rol_id INT NOT NULL,
+  fecha DATE NOT NULL,
+  hora TIME NOT NULL,
+  valor DECIMAL(12,2) NOT NULL,
+  descripcion VARCHAR(255) NOT NULL,
+  referencia VARCHAR(100) DEFAULT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  anulado TINYINT(1) NOT NULL DEFAULT 0,
+  anulado_by INT DEFAULT NULL,
+  anulado_at DATETIME DEFAULT NULL,
+  INDEX (fecha),
+  INDEX (usuario_id),
+  INDEX (rol_id),
+  INDEX (anulado),
+  CONSTRAINT fk_gastos_usuario FOREIGN KEY (usuario_id) REFERENCES users(id),
+  CONSTRAINT fk_gastos_rol FOREIGN KEY (rol_id) REFERENCES roles(id),
+  CONSTRAINT fk_gastos_anulado_by FOREIGN KEY (anulado_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+Opción A — Recomendado: agregar branch_id a gastos (persistente y correcto)
+1) Crear la columna en la base de datos
+
+Ejecuta en tu gestor MySQL (phpMyAdmin o consola):
+
+ALTER TABLE gastos
+ADD COLUMN branch_id INT NULL AFTER rol_id;
+
+
+
+
+
+
+nuevo ultimo para cantidades minimas de sucursales 
+parte 1 de 8 y solo al final necesito la respuesta de lo que te voy a pedir antes no
+
+resulta que tengo varias sucursales, y cada una maneja una cantidad minima (opcional) difente devido a que todas tienen diferentes necesidades, el problema que tengo es que el sistema productos.php da opcion de poner cantidad minima y ese valor aplica para todas las sucursales, entonces necesito al momento de crear productos tener la opcion de poder ponerle cantidad minima a cada una de las sucursales existentes por separado, que podriamos acer ahi sin tener que dañar mucho lo que ya tenemos
+
+
+-- Tabla para overrides por sucursal
+CREATE TABLE product_branch_minimums (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  product_id INT NOT NULL,
+  branch_id INT NOT NULL,
+  min_quantity INT NOT NULL DEFAULT 0,
+  UNIQUE KEY ux_product_branch (product_id, branch_id),
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+  FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
+);
+
+INSERT INTO product_branch_minimums (product_id, branch_id, min_quantity)
+SELECT p.id, b.id, COALESCE(p.min_quantity,0)
+FROM products p CROSS JOIN branches b;
+
+tablasa para compras 
+
+-- Tabla para compras (Facturas de proveedor)
+CREATE TABLE IF NOT EXISTS purchases (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    branch_id INT NOT NULL,
+    user_id INT NOT NULL,
+    provider_name VARCHAR(150) NOT NULL,
+    invoice_number VARCHAR(100) NOT NULL,
+    purchase_date DATE NOT NULL,
+    total_amount DECIMAL(12,2) DEFAULT 0.00,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Detalle de compra por producto
+CREATE TABLE IF NOT EXISTS purchase_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    purchase_id INT NOT NULL,
+    product_id INT NOT NULL,
+    qty_purchased INT NOT NULL DEFAULT 1,      -- Cantidad de empaques comprados (ej: 1)
+    packaging_qty INT NOT NULL DEFAULT 1,      -- Unidades por empaque (ej: 10)
+    total_units INT NOT NULL,                  -- Total unidades físicas = qty_purchased * packaging_qty
+    unit_cost DECIMAL(12,2) NOT NULL DEFAULT 0.00, -- Costo del empaque/unidad
+    iva_percent DECIMAL(5,2) DEFAULT 0.00,
+    is_gift TINYINT(1) DEFAULT 0,              -- 1 = Obsequio (sin costo)
+    line_total DECIMAL(12,2) DEFAULT 0.00,
+    FOREIGN KEY (purchase_id) REFERENCES purchases(id) ON DELETE CASCADE
+);
+
+-- Tabla de permisos por usuario
+CREATE TABLE IF NOT EXISTS user_permissions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    permission_key VARCHAR(50) NOT NULL,
+    UNIQUE KEY user_perm_unique (user_id, permission_key)
+);
+
+alterar tabla
+
+ALTER TABLE inventory ADD UNIQUE KEY unique_product_branch (product_id, branch_id);

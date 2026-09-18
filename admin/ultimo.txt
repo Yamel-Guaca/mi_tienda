@@ -1,0 +1,7 @@
+ahora necesito crear un nuevo codigo igreso de compras donde los 3 usuarios puedan ingresar la factura, el usuario busca en un listado los productos, selecciona el producto, luego de seleccionar procede a colocar la cantidad, el usuario pone cantidad ejemplo 1, luego poner embalaje donde pone ejemplo 10, lo que quiere decir que 1 es igual a 10 productos que vienen, luego sigue valor unitario: el usuario poner el valor unitario de cantidad, iva si es el caso, despues esta total es la multiplicaion de la cantidad por valor unitario, y al final de abajo total pagado seria la suma de todos los total de cada producto, 
+
+los productos ejemplo del caso 10 que sean bombillo 40w una vez guardado se deve agregar esa cantidad al inventario de la sucursal que corresponda,
+
+las facturas en ocaiones bienen con opsequios que no tiene valor se deve tener la opcion de poder ingresar esos productos sin valor,
+
+el sistema deve dar opcion de imprimir ticket como soporte de que se ingreso la factura, una vez se haya guardado la informacion, 
