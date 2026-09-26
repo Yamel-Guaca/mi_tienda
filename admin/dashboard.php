@@ -150,48 +150,104 @@ try {
   </header>
 
   <!-- ✅ ENLACES RÁPIDOS COMPLETOS -->
-    <p class="small" style="margin-top:12px;">Enlaces rápidos: 
-      <a href="/mi_tienda/admin/productos.php">Gestión de productos</a> · 
-      <a href="/mi_tienda/admin/inventario.php">Inventario</a> · 
-     <a href="/mi_tienda/admin/inventario_bajo.php">Inventario bajo</a> · 
-     <a href="/mi_tienda/admin/kardex.php">Kardex</a> · 
-     <a href="/mi_tienda/admin/categorias.php">Categorías</a> · 
-      <a href="/mi_tienda/admin/subcategorias.php">Subcategorías</a> · 
-      <a href="/mi_tienda/admin/pedidos.php">Pedidos</a> · 
-      <a href="/mi_tienda/admin/cierres_diarios.php">Cierres diarios</a> · 
-      <a href="/mi_tienda/admin/usuarios.php">Usuarios</a> · 
-      <a href="/mi_tienda/admin/sucursales.php">Sucursales</a> · 
-      <a href="/mi_tienda/admin/caja.php">Caja</a> · 
-      <a href="/mi_tienda/admin/reportes.php">Reportes</a> · 
-      <a href="/mi_tienda/admin/pos.php">POS</a> ·
-      <a href="/mi_tienda/admin/reportes_ganancias.php" class="btn">Reporte de Ganancias</a>       
-      <a href="/mi_tienda/admin/invoices_list.php" class="btn">Borrar Factura</a>
-      <a href="/mi_tienda/admin/branch_visibility.php" class="btn">Visibilidad de Categorías y Subcategorías por Sucursal</a>
-      <a href="/mi_tienda/admin/invoice_template.php">Plantilla Factura</a>
+<div class="quick-links-container">
+    <span class="quick-links-title">Enlaces rápidos:</span>
+    <a href="/mi_tienda/admin/productos.php" class="quick-btn">📦 Gestión de productos</a>
+    <a href="/mi_tienda/admin/inventario.php" class="quick-btn">📋 Inventario</a>
+    <a href="/mi_tienda/admin/inventario_bajo.php" class="quick-btn">⚠️ Inventario bajo</a>
+    <a href="/mi_tienda/admin/kardex.php" class="quick-btn">🔄 Kardex</a>
+    <a href="/mi_tienda/admin/categorias.php" class="quick-btn">🏷️ Categorías</a>
+    <a href="/mi_tienda/admin/subcategorias.php" class="quick-btn">🔖 Subcategorías</a>
+    <a href="/mi_tienda/admin/pedidos.php" class="quick-btn">🚚 Pedidos</a>
+    <a href="/mi_tienda/admin/cierres_diarios.php" class="quick-btn">🔒 Cierres diarios</a>
+    <a href="/mi_tienda/admin/usuarios.php" class="quick-btn">👥 Usuarios</a>
+    <a href="/mi_tienda/admin/sucursales.php" class="quick-btn">🏢 Sucursales</a>
+    <a href="/mi_tienda/admin/caja.php" class="quick-btn">💵 Caja</a>
+    <a href="/mi_tienda/admin/reportes.php" class="quick-btn">📊 Reportes</a>
+    <a href="/mi_tienda/admin/pos.php" class="quick-btn quick-btn-primary">🖥️ POS</a>
+    <a href="/mi_tienda/admin/reportes_ganancias.php" class="quick-btn">📈 Reporte de Ganancias</a>
+    <a href="/mi_tienda/admin/invoices_list.php" class="quick-btn quick-btn-danger">🗑️ Borrar Factura</a>
+    <a href="/mi_tienda/admin/branch_visibility.php" class="quick-btn">👁️ Visibilidad por Sucursal</a>
+    <a href="/mi_tienda/admin/invoice_template.php" class="quick-btn">📄 Plantilla Factura</a>
+    <a href="/mi_tienda/admin/gastos.php" class="quick-btn">💸 Gastos</a>
+    <a href="/mi_tienda/admin/gastos_list.php" class="quick-btn">📜 Lista de Gastos</a>
+    <a href="/mi_tienda/admin/compras.php" class="quick-btn quick-btn-success">🛒 Ir a Compras</a>
+    <a href="/mi_tienda/admin/permisos.php" class="quick-btn quick-btn-success">Ir a Permisos</a>
 
-      <a href="/mi_tienda/admin/gastos.php">Gastos</a>
-      <a href="/mi_tienda/admin/gastos_list.php">Lista de Gastos</a>
-      <a href="/mi_tienda/admin/compras.php" class="btn-compras">
-          🛒 ir a Compras
-      </a>
+</div>
 
-      <style>
-      .btn-compras {
-          display: inline-block;
-          padding: 8px 16px;
-          background-color: #0a6;
-          color: #ffffff;
-          text-decoration: none;
-          border-radius: 4px;
-          font-weight: bold;
-          font-family: Arial, sans-serif;
-          transition: background-color 0.2s;
-      }
-      .btn-compras:hover {
-          background-color: #085;
-      }
+<style>
+.quick-links-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-top: 15px;
+    margin-bottom: 20px;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.quick-links-title {
+    font-weight: 700;
+    font-size: 14px;
+    color: #334155;
+    margin-right: 4px;
+    width: 100%;
+}
+
+.quick-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    background-color: #f1f5f9;
+    color: #1e293b;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid #cbd5e1;
+    transition: all 0.2s ease-in-out;
+}
+
+.quick-btn:hover {
+    background-color: #e2e8f0;
+    color: #0f172a;
+    border-color: #94a3b8;
+    transform: translateY(-1px);
+}
+
+/* Colores destacados para acciones clave */
+.quick-btn-primary {
+    background-color: #2563eb;
+    color: #ffffff;
+    border-color: #1d4ed8;
+}
+.quick-btn-primary:hover {
+    background-color: #1d4ed8;
+    color: #ffffff;
+}
+
+.quick-btn-success {
+    background-color: #059669;
+    color: #ffffff;
+    border-color: #047857;
+}
+.quick-btn-success:hover {
+    background-color: #047857;
+    color: #ffffff;
+}
+
+.quick-btn-danger {
+    background-color: #dc2626;
+    color: #ffffff;
+    border-color: #b91c1c;
+}
+.quick-btn-danger:hover {
+    background-color: #b91c1c;
+    color: #ffffff;
+}
 </style>
-
     </p>
 
   <div class="container">

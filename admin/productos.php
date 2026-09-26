@@ -224,15 +224,18 @@ if ($action === 'edit' && $_SERVER['REQUEST_METHOD'] === 'POST' && $id) {
     // ✅ Nuevo campo rounding_enabled
     $rounding_enabled = isset($_POST['rounding_enabled']) ? (int)$_POST['rounding_enabled'] : 1;
 
+    // ✅ Nuevo campo visible_web
+    $visible_web = isset($_POST['visible_web']) ? (int)$_POST['visible_web'] : 1;
+
     if ($name && $sku && $price_unit > 0 && $cat_id > 0 && $sub_id > 0) {
         $stmt = $pdo->prepare("
             UPDATE products 
             SET name=?, sku=?, price=?, min_quantity=?, category_id=?, subcategory_id=?,
-                cost_initial=?, packaging_type=?, packaging_qty=?, iva_percent=?, margin_percent=?, price_unit=?, rounding_enabled=?
+                cost_initial=?, packaging_type=?, packaging_qty=?, iva_percent=?, margin_percent=?, price_unit=?, rounding_enabled=?, visible_web=?
             WHERE id=?
         ");
         $stmt->execute([$name, $sku, $price_unit, $min_q, $cat_id, $sub_id,
-            $cost_initial, $packaging_type, $packaging_qty, $iva_percent, $margin_percent, $price_unit, $rounding_enabled, $id]);
+            $cost_initial, $packaging_type, $packaging_qty, $iva_percent, $margin_percent, $price_unit, $rounding_enabled, $visible_web, $id]);
 
         if (!empty($_FILES['images']['name'][0])) {
             save_product_images($id, $_FILES['images'], $pdo);
@@ -292,7 +295,6 @@ if ($action === 'edit' && $_SERVER['REQUEST_METHOD'] === 'POST' && $id) {
         $msg = "Todos los campos obligatorios deben estar completos.";
     }
 }
-
 // ============================================================
 // 2.5 CARGAR DATOS PARA EDICIÓN Y LISTADO
 // ============================================================
@@ -578,6 +580,18 @@ $nextSku = $lastSku > 0 ? $lastSku + 1 : 100;
         <?php else: ?>
           <p class="small">No se encontraron sucursales.</p>
         <?php endif; ?>
+        <!-- ======= Fin bloque ======= -->
+
+        <!-- ======= Nuevo bloque: Visibilidad Web ======= -->
+        <label for="visible_web" style="font-weight:600; margin-top:10px; display:block;">Visibilidad en el sitio web:</label>
+        <select name="visible_web" id="visible_web" style="padding:6px; border:1px solid #ddd; border-radius:6px; margin-bottom:12px;">
+            <option value="1" <?= (isset($edit_product['visible_web']) && (int)$edit_product['visible_web'] === 1) ? 'selected' : '' ?>>
+                Visible (Mostrar en tienda)
+            </option>
+            <option value="0" <?= (isset($edit_product['visible_web']) && (int)$edit_product['visible_web'] === 0) ? 'selected' : '' ?>>
+                Oculto (No mostrar en tienda)
+            </option>
+        </select>
         <!-- ======= Fin bloque ======= -->
 
         <label>Categoría:</label>

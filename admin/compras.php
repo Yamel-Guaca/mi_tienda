@@ -129,8 +129,6 @@ $branches =$pdo->query("SELECT id, name FROM branches WHERE active = 1 ORDER BY 
 
     <h2>Ingreso de Factura de Compra</h2>
 
-    
-
     <?php if ($message): ?>
         <div class="alert"><?= htmlspecialchars($message) ?></div>
     <?php endif; ?>
@@ -380,9 +378,9 @@ function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
-// Impresión obligatoria automática tras guardar
+// Impresión obligatoria automática tras guardar enviando a invoice_print.php
 <?php if ($print_purchase_id): ?>
-window.open('/mi_tienda/admin/ticket_compra.php?id=<?= $print_purchase_id ?>', '_blank', 'width=400,height=600');
+window.open('/mi_tienda/admin/invoice_print.php?purchase_id=<?= $print_purchase_id ?>', '_blank', 'width=400,height=600');
 <?php endif; ?>
 </script>
 

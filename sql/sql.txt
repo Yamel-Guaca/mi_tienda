@@ -100,3 +100,16 @@ CREATE TABLE IF NOT EXISTS user_permissions (
 alterar tabla
 
 ALTER TABLE inventory ADD UNIQUE KEY unique_product_branch (product_id, branch_id);
+
+
+
+
+para poder seleccionar que se ve en la pagina y que NO = funcional
+
+ALTER TABLE products 
+ADD COLUMN visible_web TINYINT(1) NOT NULL DEFAULT 1;
+
+...........todo hasta aqui cargado........
+
+
+
