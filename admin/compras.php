@@ -1,4 +1,43 @@
 <?php
+/**
+ * =====================================================================================
+ * EXPLICACIÓN Y FUNCIONAMIENTO GENERAL DEL MÓDULO DE COMPRAS (admin/compras.php)
+ * =====================================================================================
+ * 
+ * 1. CONTROL DE SESIÓN Y SEGURIDAD:
+ *    - Inicia o recupera la sesión activa.
+ *    - Captura el ID de usuario autenticado (`$user_id`) mediante múltiples posibles llaves.
+ *    - Valida si el usuario es Administrador (evaluando roles como 'admin', 'administrador'
+ *      o `role_id == 1`). Si no es admin, verifica permisos específicos en la tabla `user_permissions`.
+ *
+ * 2. PROCESAMIENTO DEL FORMULARIO DE COMPRA (POST):
+ *    - Al enviar el formulario (`save_purchase`), recibe:
+ *      * `branch_id`: ID de la sucursal de destino.
+ *      * `provider_name`: Nombre en texto del proveedor (guardado directamente en `purchases`).
+ *      * `invoice_number`: Número/Código de la factura.
+ *      * `purchase_date`: Fecha de la transacción.
+ *      * `items_json`: Cadena JSON generada por JavaScript con la lista de productos agregados.
+ *    
+ * 3. TRANSACCIÓN DE BASE DE DATOS (ACID):
+ *    - `beginTransaction()`: Garantiza que si falla algún punto, no se guarden datos a medias.
+ *    - Paso 1 (Factura): Inserta en la tabla `purchases` el encabezado de la compra con el `total_amount`.
+ *    - Paso 2 (Detalle): Recupera el `purchase_id` generado (`lastInsertId`) e inserta cada producto 
+ *      en la tabla `purchase_items`.
+ *    - Paso 3 (Inventario): Ejecuta la actualización en la tabla `inventory` utilizando
+ *      `ON DUPLICATE KEY UPDATE quantity = quantity + VALUES(quantity)`. Esto suma las unidades
+ *      compradas al stock existente para el producto y sucursal especificados.
+ *    - `commit()`: Confirma todos los cambios en la base de datos.
+ *
+ * 4. IMPRESIÓN DEL SOPORTE:
+ *    - Asigna `$print_purchase_id = $purchase_id`, lo cual activa un script en el frontend
+ *      que abre automáticamente una ventana emergente hacia `/mi_tienda/admin/invoice_print.php`.
+ *
+ * 5. INTERFAZ DINÁMICA (JAVASCRIPT):
+ *    - Búsqueda en vivo mediante AJAX (`/mi_tienda/admin/ajax/search_products.php`).
+ *    - Gestión de productos seleccionados, empaques, obsequios y cálculo dinámico de IVA/Subtotales.
+ * =====================================================================================
+ */
+
 // admin/compras.php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
