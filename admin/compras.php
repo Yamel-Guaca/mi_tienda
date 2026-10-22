@@ -1,71 +1,39 @@
 <?php
 /**
  * =====================================================================================
- * EXPLICACIÓN Y FUNCIONAMIENTO GENERAL DEL MÓDULO DE COMPRAS (admin/compras.php)
- * =====================================================================================
- * 
- * 1. CONTROL DE SESIÓN Y SEGURIDAD:
- *    - Inicia o recupera la sesión activa.
- *    - Captura el ID de usuario autenticado (`$user_id`) mediante múltiples posibles llaves.
- *    - Valida si el usuario es Administrador (evaluando roles como 'admin', 'administrador'
- *      o `role_id == 1`). Si no es admin, verifica permisos específicos en la tabla `user_permissions`.
- *
- * 2. PROCESAMIENTO DEL FORMULARIO DE COMPRA (POST):
- *    - Al enviar el formulario (`save_purchase`), recibe:
- *      * `branch_id`: ID de la sucursal de destino.
- *      * `provider_name`: Nombre en texto del proveedor (guardado directamente en `purchases`).
- *      * `invoice_number`: Número/Código de la factura.
- *      * `purchase_date`: Fecha de la transacción.
- *      * `items_json`: Cadena JSON generada por JavaScript con la lista de productos agregados.
- *    
- * 3. TRANSACCIÓN DE BASE DE DATOS (ACID):
- *    - `beginTransaction()`: Garantiza que si falla algún punto, no se guarden datos a medias.
- *    - Paso 1 (Factura): Inserta en la tabla `purchases` el encabezado de la compra con el `total_amount`.
- *    - Paso 2 (Detalle): Recupera el `purchase_id` generado (`lastInsertId`) e inserta cada producto 
- *      en la tabla `purchase_items`.
- *    - Paso 3 (Inventario): Ejecuta la actualización en la tabla `inventory` utilizando
- *      `ON DUPLICATE KEY UPDATE quantity = quantity + VALUES(quantity)`. Esto suma las unidades
- *      compradas al stock existente para el producto y sucursal especificados.
- *    - `commit()`: Confirma todos los cambios en la base de datos.
- *
- * 4. IMPRESIÓN DEL SOPORTE:
- *    - Asigna `$print_purchase_id = $purchase_id`, lo cual activa un script en el frontend
- *      que abre automáticamente una ventana emergente hacia `/mi_tienda/admin/invoice_print.php`.
- *
- * 5. INTERFAZ DINÁMICA (JAVASCRIPT):
- *    - Búsqueda en vivo mediante AJAX (`/mi_tienda/admin/ajax/search_products.php`).
- *    - Gestión de productos seleccionados, empaques, obsequios y cálculo dinámico de IVA/Subtotales.
+ * MÓDULO DE COMPRAS Y RECEPCIÓN DE MERCANCÍA (admin/compras.php)
  * =====================================================================================
  */
 
-// admin/compras.php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Incluir la conexión desde la carpeta includes usando ruta absoluta
 require_once __DIR__ . '/../includes/db.php'; 
 
-// Capturar ID de usuario admitiendo varios nombres de clave de sesión
-$user_id =$_SESSION['user_id'] ?? $_SESSION['id_usuario'] ?? $_SESSION['id'] ?? 0;
+// Capturar ID de usuario
+$user_id = $_SESSION['user_id'] ?? $_SESSION['id_usuario'] ?? $_SESSION['id'] ?? $_SESSION['user']['id'] ?? 0;
 
-// Capturar el Rol (ya sea por nombre o por ID de la tabla de roles)
-$user_role = $_SESSION['user_role'] ?? $_SESSION['rol'] ?? $_SESSION['role'] ?? $_SESSION['tipo'] ?? '';
-$role_id   =$_SESSION['role_id'] ?? $_SESSION['id_rol'] ?? $_SESSION['rol_id'] ?? 0;
+// Capturar Sucursal desde la Sesión
+$user_branch_id =$_SESSION['branch_id'] ?? $_SESSION['user']['branch_id'] ?? $_SESSION['id_sucursal'] ?? 0;
+
+// Capturar Rol
+$user_role = $_SESSION['user_role'] ?? $_SESSION['rol'] ?? $_SESSION['role'] ?? $_SESSION['tipo'] ?? $_SESSION['user']['role_id'] ?? '';$role_id   = $_SESSION['role_id'] ?? $_SESSION['id_rol'] ?? $_SESSION['rol_id'] ?? $_SESSION['user']['role_id'] ?? 0;
 
 if (!$user_id) {
     header('Location: /mi_tienda/login.php');
     exit;
 }
 
-// Evaluación flexible de Administrador: por nombre ("admin", "administrador") o por ID de rol (1)
+$pdo = DB::getConnection();
+
+// Evaluación flexible de Administrador
 $is_admin = (
     strtolower((string)$user_role) === 'admin' || 
     strtolower((string)$user_role) === 'administrador' || 
     intval($role_id) === 1
 );
 
-// Comprobación de permiso si no es Administrador
 if (!$is_admin) {
     $stmt =$pdo->prepare("SELECT COUNT(*) FROM user_permissions WHERE user_id = ? AND permission_key = 'compras'");
     $stmt->execute([$user_id]);
@@ -79,6 +47,12 @@ $message = '';$print_purchase_id = null;
 // PROCESAR GUARDADO DE COMPRA
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_purchase'])) {
     $branch_id     = intval($_POST['branch_id'] ?? 0);
+    
+    // Si no es admin y tiene sucursal asignada en sesión, forzar la sucursal de sesión por seguridad
+    if (!$is_admin &&$user_branch_id > 0) {
+        $branch_id =$user_branch_id;
+    }
+
     $provider      = trim($_POST['provider_name'] ?? '');
     $invoice_no    = trim($_POST['invoice_number'] ?? '');
     $purchase_date =$_POST['purchase_date'] ?? date('Y-m-d');
@@ -94,39 +68,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_purchase'])) {
                 $total_paid += floatval($it['line_total']);
             }
 
-            // 1. Insertar Factura
+            // 1. Insertar Factura de Compra
             $stmt =$pdo->prepare("INSERT INTO purchases (branch_id, user_id, provider_name, invoice_number, purchase_date, total_amount) VALUES (?, ?, ?, ?, ?, ?)");
             $stmt->execute([$branch_id,$user_id, $provider,$invoice_no, $purchase_date,$total_paid]);
             $purchase_id =$pdo->lastInsertId();
 
-            // 2. Insertar ítems y actualizar stock en la tabla inventory (product_id, branch_id, quantity)
+            // 2. Preparar consultas para detalles, inventario y movimientos
             $stmtItem =$pdo->prepare("INSERT INTO purchase_items (purchase_id, product_id, qty_purchased, packaging_qty, total_units, unit_cost, iva_percent, is_gift, line_total) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
             
-            // Consulta adaptada a tu tabla 'inventory' real
             $stmtStock =$pdo->prepare("INSERT INTO inventory (product_id, branch_id, quantity) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE quantity = quantity + VALUES(quantity)");
 
-            foreach ($items as $it) {$p_id        = intval($it['product_id']);$qty         = max(1, intval($it['qty']));$pack_qty    = max(1, intval($it['packaging_qty']));$total_units = $qty * $pack_qty;
-                $is_gift     = !empty($it['is_gift']) ? 1 : 0;
-                $unit_cost   =$is_gift ? 0 : floatval($it['unit_cost']);$iva         = floatval($it['iva']);$line_total  = $is_gift ? 0 : floatval($it['line_total']);
+            $stmtMovement =$pdo->prepare("INSERT INTO inventory_movements (product_id, branch_id, user_id, type, quantity, note) VALUES (?, ?, ?, 'entrada', ?, ?)");
 
-                $stmtItem->execute([$purchase_id, $p_id,$qty, $pack_qty,$total_units, $unit_cost,$iva, $is_gift,$line_total]);
+            foreach ($items as$it) {
+                $p_id        = intval($it['product_id']);
+                $qty         = max(1, intval($it['qty']));
+                $pack_qty    = max(1, intval($it['packaging_qty']));
                 
-                // Actualiza o inserta las unidades en tu tabla 'inventory'
-                $stmtStock->execute([$p_id, $branch_id,$total_units]);
+                // Consultar factores del producto real desde la BD por seguridad
+                $stmtP =$pdo->prepare("SELECT has_inner_units, inner_unit_qty FROM products WHERE id = ?");
+                $stmtP->execute([$p_id]);
+                $productData =$stmtP->fetch(PDO::FETCH_ASSOC);
+
+                $hasInner = !empty($productData['has_inner_units']);$innerQty = $hasInner ? max(1, intval($productData['inner_unit_qty'] ?? 1)) : 1;
+
+                // Total de unidades físicas mínimas agregadas al inventario
+                $total_stock_units =$qty * $pack_qty * $innerQty;
+
+                $is_gift   = !empty($it['is_gift']) ? 1 : 0;
+                $unit_cost =$is_gift ? 0 : floatval($it['unit_cost']);$iva       = floatval($it['iva']);$line_total = $is_gift ? 0 : floatval($it['line_total']);
+
+                // Insertar ítem de compra
+                $stmtItem->execute([$purchase_id, $p_id,$qty, $pack_qty,$total_stock_units, $unit_cost,$iva, $is_gift,$line_total]);
+                
+                // Actualizar inventario por unidades mínimas
+                $stmtStock->execute([$p_id, $branch_id,$total_stock_units]);
+
+                // Registrar movimiento en el kardex
+                $note = 'Entrada por Compra Factura N° ' . $invoice_no . ' (' . $provider . ')';$stmtMovement->execute([$p_id,$branch_id, $user_id,$total_stock_units, $note]);
             }
 
             $pdo->commit();$message = "Factura de compra registrada exitosamente.";
-            $print_purchase_id =$purchase_id; // Disparar impresión
+            $print_purchase_id =$purchase_id;
         } catch (Exception $e) {
-            $pdo->rollBack();$message = "Error al guardar la compra: " . $e->getMessage();
+            if ($pdo->inTransaction()) {$pdo->rollBack();
+            }
+            $message = "Error al guardar la compra: " . $e->getMessage();
         }
     } else {
         $message = "Por favor complete todos los campos obligatorios e ingrese al menos un producto.";
     }
 }
 
-// Cargar sucursales para el select
+// Cargar sucursales activas
 $branches =$pdo->query("SELECT id, name FROM branches WHERE active = 1 ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+// Obtener el nombre de la sucursal del usuario
+$user_branch_name = '';
+foreach ($branches as$b) {
+    if ($b['id'] ==$user_branch_id) {
+        $user_branch_name =$b['name'];
+        break;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -159,12 +163,11 @@ $branches =$pdo->query("SELECT id, name FROM branches WHERE active = 1 ORDER BY 
 <body>
 
 <div class="container">
-  
-  <a href="pos.php" style="text-decoration: none;">
-    <div style="display: inline-flex; align-items: center; gap: 8px; background-color: #2563eb; color: #ffffff; padding: 10px 18px; border-radius: 6px; font-weight: 600; font-family: system-ui, sans-serif; cursor: pointer; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#1d4ed8'" onmouseout="this.style.backgroundColor='#2563eb'">
-        🛒 Ir al POS / Ventas
-    </div>
-</a>
+    <a href="pos.php" style="text-decoration: none;">
+        <div style="display: inline-flex; align-items: center; gap: 8px; background-color: #2563eb; color: #ffffff; padding: 10px 18px; border-radius: 6px; font-weight: 600; cursor: pointer; margin-bottom: 15px;">
+            🛒 Ir al POS / Ventas
+        </div>
+    </a>
 
     <h2>Ingreso de Factura de Compra</h2>
 
@@ -179,12 +182,21 @@ $branches =$pdo->query("SELECT id, name FROM branches WHERE active = 1 ORDER BY 
         <div class="form-row">
             <div class="form-group">
                 <label>Sucursal de Destino *</label>
-                <select name="branch_id" required>
-                    <option value="">Seleccione Sucursal</option>
-                    <?php foreach ($branches as$b): ?>
-                        <option value="<?= $b['id'] ?>"><?= htmlspecialchars($b['name']) ?></option>
-                    <?php endforeach; ?>
-                </select>
+                <?php if (!$is_admin &&$user_branch_id > 0): ?>
+                    <!-- Si NO es Admin: Fijar la sucursal del usuario sin opción a cambiar -->
+                    <input type="hidden" name="branch_id" value="<?= $user_branch_id ?>">
+                    <input type="text" value="<?= htmlspecialchars($user_branch_name ?: 'Sucursal Actual') ?>" readonly style="background:#e2e8f0; cursor:not-allowed; font-weight:bold;">
+                <?php else: ?>
+                    <!-- Si SÍ es Admin: Permitir elegir sucursal, seleccionando por defecto la suya -->
+                    <select name="branch_id" required>
+                        <option value="">Seleccione Sucursal</option>
+                        <?php foreach ($branches as$b): ?>
+                            <option value="<?= $b['id'] ?>" <?= ($b['id'] ==$user_branch_id) ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($b['name']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                <?php endif; ?>
             </div>
             <div class="form-group">
                 <label>Proveedor *</label>
@@ -211,23 +223,23 @@ $branches =$pdo->query("SELECT id, name FROM branches WHERE active = 1 ORDER BY 
             </div>
         </div>
 
-        <!-- Campos dinámicos del ítem seleccionado -->
         <div class="form-row" id="item_editor" style="background: #f8fafc; padding: 15px; border-radius: 6px; align-items: flex-end;">
             <input type="hidden" id="sel_product_id">
+            <input type="hidden" id="sel_inner_unit_qty" value="1">
             <div class="form-group" style="flex:2;">
                 <label>Producto Seleccionado</label>
                 <input type="text" id="sel_product_name" readonly placeholder="Ninguno" style="background:#e2e8f0;">
             </div>
             <div class="form-group">
-                <label>Cantidad</label>
+                <label>Cantidad Empaques</label>
                 <input type="number" id="sel_qty" min="1" value="1">
             </div>
             <div class="form-group">
-                <label>Embalaje (Unid. x empaque)</label>
+                <label>Embalaje (Contenedores/Cajas)</label>
                 <input type="number" id="sel_pack_qty" min="1" value="1">
             </div>
             <div class="form-group">
-                <label>Valor Unitario</label>
+                <label>Valor Unitario Inicial</label>
                 <input type="number" step="0.01" id="sel_unit_cost" placeholder="0.00">
             </div>
             <div class="form-group">
@@ -242,14 +254,13 @@ $branches =$pdo->query("SELECT id, name FROM branches WHERE active = 1 ORDER BY 
             </div>
         </div>
 
-        <!-- Tabla de ítems agregados -->
         <table>
             <thead>
                 <tr>
                     <th>Producto</th>
                     <th>Cant. Empaques</th>
                     <th>Embalaje</th>
-                    <th>Total Unidades Stock</th>
+                    <th>Total Unidades Mínimas</th>
                     <th>Valor Unitario</th>
                     <th>IVA %</th>
                     <th>Obsequio</th>
@@ -275,7 +286,6 @@ $branches =$pdo->query("SELECT id, name FROM branches WHERE active = 1 ORDER BY 
 <script>
 let addedItems = [];
 
-// Búsqueda en vivo de productos por AJAX
 const searchInput = document.getElementById('product_search_input');
 const searchResults = document.getElementById('search_results');
 
@@ -310,13 +320,17 @@ function selectProduct(p) {
     document.getElementById('sel_pack_qty').value = p.packaging_qty || 1;
     document.getElementById('sel_unit_cost').value = p.cost_initial || 0;
     document.getElementById('sel_iva').value = p.iva_percent || 0;
+    
+    const hasInner = p.has_inner_units == '1' || p.has_inner_units === true;
+    const innerQty = hasInner ? (parseInt(p.inner_unit_qty, 10) || 1) : 1;
+    document.getElementById('sel_inner_unit_qty').value = innerQty;
+
     document.getElementById('sel_is_gift').checked = false;
     toggleGiftState();
     searchResults.style.display = 'none';
     searchInput.value = '';
 }
 
-// Checkbox de obsequio desactiva campos de costo
 document.getElementById('sel_is_gift').addEventListener('change', toggleGiftState);
 function toggleGiftState() {
     const isGift = document.getElementById('sel_is_gift').checked;
@@ -338,6 +352,8 @@ function addItemToTable() {
     const pName = document.getElementById('sel_product_name').value;
     const qty = parseInt(document.getElementById('sel_qty').value) || 1;
     const packQty = parseInt(document.getElementById('sel_pack_qty').value) || 1;
+    const innerQty = parseInt(document.getElementById('sel_inner_unit_qty').value) || 1;
+    
     const isGift = document.getElementById('sel_is_gift').checked;
     const unitCost = isGift ? 0 : (parseFloat(document.getElementById('sel_unit_cost').value) || 0);
     const iva = isGift ? 0 : (parseFloat(document.getElementById('sel_iva').value) || 0);
@@ -347,7 +363,7 @@ function addItemToTable() {
         return;
     }
 
-    const totalUnits = qty * packQty;
+    const totalUnits = qty * packQty * innerQty;
     const subtotal = qty * unitCost;
     const lineTotal = subtotal + (subtotal * (iva / 100));
 
@@ -372,6 +388,7 @@ function clearEditor() {
     document.getElementById('sel_product_name').value = '';
     document.getElementById('sel_qty').value = 1;
     document.getElementById('sel_pack_qty').value = 1;
+    document.getElementById('sel_inner_unit_qty').value = 1;
     document.getElementById('sel_unit_cost').value = '';
     document.getElementById('sel_iva').value = 0;
     document.getElementById('sel_is_gift').checked = false;
@@ -417,7 +434,6 @@ function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
-// Impresión obligatoria automática tras guardar enviando a invoice_print.php
 <?php if ($print_purchase_id): ?>
 window.open('/mi_tienda/admin/invoice_print.php?purchase_id=<?= $print_purchase_id ?>', '_blank', 'width=400,height=600');
 <?php endif; ?>

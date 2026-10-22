@@ -109,7 +109,186 @@ para poder seleccionar que se ve en la pagina y que NO = funcional
 ALTER TABLE products 
 ADD COLUMN visible_web TINYINT(1) NOT NULL DEFAULT 1;
 
+
+
+
 ...........todo hasta aqui cargado........
 
 
 
+
+
+sin cambiar el significado de packaging_qty. La incorporación principal será 
+has_inner_units + inner_unit_qty, de modo que un producto pueda representar 
+1 caja = 60 paquetes = 3.000 vasos, mientras que los productos que no necesiten 
+subdivisión seguirán funcionando como ahora.
+
+ALTER TABLE products
+    ADD COLUMN has_inner_units TINYINT(1) NOT NULL DEFAULT 0 AFTER packaging_qty,
+    ADD COLUMN inner_unit_qty INT UNSIGNED NULL AFTER has_inner_units;
+
+    ALTER TABLE product_prices
+ADD COLUMN unit_level ENUM('package','inner','individual')
+NOT NULL DEFAULT 'package'
+AFTER unit_label;
+
+-- 1. Agregar solo 'printed_invoice_html' a la tabla orders
+ALTER TABLE `orders` ADD COLUMN `printed_invoice_html` LONGTEXT NULL;
+
+-- 2. Agregar columnas a la tabla gastos
+ALTER TABLE `gastos` ADD COLUMN `printed_invoice_html` LONGTEXT NULL;
+ALTER TABLE `gastos` ADD COLUMN `printed_at` DATETIME NULL;
+
+-- 3. Agregar columnas a la tabla purchases
+ALTER TABLE `purchases` ADD COLUMN `printed_invoice_html` LONGTEXT NULL;
+ALTER TABLE `purchases` ADD COLUMN `printed_at` DATETIME NULL;
+
+ALTER TABLE product_prices 
+ADD COLUMN image_id INT NULL DEFAULT NULL AFTER iva_percent,
+ADD CONSTRAINT fk_product_prices_image 
+FOREIGN KEY (image_id) REFERENCES product_images(id) ON DELETE SET NULL;
+
+para Paso 1: Estructura de las Tablas en la Base de Datos
+Ejecuta estas consultas en tu base de datos SQL para crear la tabla de pedidos con soporte para sucursales:
+
+
+CREATE TABLE IF NOT EXISTS orders (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    branch_id INT NOT NULL, -- Sucursal responsable del despacho
+    customer_name VARCHAR(150) NOT NULL,
+    customer_email VARCHAR(150) NOT NULL,
+    customer_doc_type VARCHAR(10) NOT NULL,
+    customer_doc_num VARCHAR(20) NOT NULL,
+    customer_phone VARCHAR(30) NOT NULL,
+    customer_address TEXT NOT NULL,
+    total DECIMAL(12,2) NOT NULL,
+    payment_status ENUM('pendiente', 'pagado', 'rechazado') DEFAULT 'pendiente',
+    fulfillment_status ENUM('pendiente', 'en_preparacion', 'despachado', 'entregado') DEFAULT 'pendiente',
+    wompi_transaction_id VARCHAR(100) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (branch_id) REFERENCES branches(id)
+);
+
+CREATE TABLE IF NOT EXISTS order_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    product_id INT NOT NULL,
+    product_name VARCHAR(200) NOT NULL,
+    unit_price DECIMAL(12,2) NOT NULL,
+    quantity INT NOT NULL,
+    subtotal DECIMAL(12,2) NOT NULL,
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+);
+
+ALTER TABLE orders 
+  ADD COLUMN customer_email VARCHAR(150) NULL AFTER customer_name,
+  ADD COLUMN customer_doc_type VARCHAR(10) NULL AFTER customer_email,
+  ADD COLUMN customer_doc_num VARCHAR(20) NULL AFTER customer_doc_type,
+  ADD COLUMN fulfillment_status ENUM('pendiente', 'en_preparacion', 'despachado', 'entregado') DEFAULT 'pendiente' AFTER status;
+
+  
+para creacion de base de datos de los clientes en la pagina web y el pos del local, 
+
+-- 1. Crear la tabla unificada de clientes
+CREATE TABLE IF NOT EXISTS customers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    doc_type VARCHAR(20) DEFAULT 'CC',
+    doc_num VARCHAR(50) NULL,
+    phone VARCHAR(50) NULL,
+    email VARCHAR(150) NULL,
+    address VARCHAR(255) NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_doc_num (doc_num)
+);
+
+-- 2. Insertar el registro por defecto "Consumidor Final" (Estándar DIAN)
+INSERT INTO customers (id, name, doc_type, doc_num, phone, email, address)
+VALUES (1, 'Consumidor Final', 'CC', '222222222222', '', '', '')
+ON DUPLICATE KEY UPDATE name=VALUES(name);
+
+-- 3. Extraer y migrar automáticamente todos los clientes únicos registrados en tus ventas pasadas
+INSERT IGNORE INTO customers (name, doc_type, doc_num, phone, email, address)
+SELECT DISTINCT 
+    customer_name, 
+    COALESCE(customer_doc_type, 'CC'), 
+    customer_doc_num, 
+    customer_phone, 
+    customer_email, 
+    customer_address
+FROM orders
+WHERE customer_doc_num IS NOT NULL 
+  AND customer_doc_num != '' 
+  AND customer_doc_num != '222222222222';
+
+-- 4. Agregar la columna customer_id a la tabla orders
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_id INT NULL AFTER user_id;
+
+-- 5. Vincular las órdenes antiguas con los IDs de la nueva tabla de clientes
+UPDATE orders o
+JOIN customers c ON o.customer_doc_num = c.doc_num
+SET o.customer_id = c.id
+WHERE o.customer_doc_num IS NOT NULL AND o.customer_doc_num != '';
+
+-- 6. Asignar ID 1 (Consumidor Final) a las órdenes que no tenían documento registrado
+UPDATE orders 
+SET customer_id = 1 
+WHERE customer_id IS NULL;
+
+Solución 1: Homologar el cotejamiento de la tabla customers (Recomendada)
+Ejecuta esta consulta para cambiar el cotejamiento de toda la tabla customers a utf8mb4_unicode_ci:
+
+SQL
+ALTER TABLE customers CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+Una vez ejecutado el comando anterior, vuelve a correr la consulta #5 sin modificaciones:
+
+ingresar nuevamente:
+
+-- 1. Crear la tabla unificada de clientes
+CREATE TABLE IF NOT EXISTS customers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    doc_type VARCHAR(20) DEFAULT 'CC',
+    doc_num VARCHAR(50) NULL,
+    phone VARCHAR(50) NULL,
+    email VARCHAR(150) NULL,
+    address VARCHAR(255) NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_doc_num (doc_num)
+);
+
+-- 2. Insertar el registro por defecto "Consumidor Final" (Estándar DIAN)
+INSERT INTO customers (id, name, doc_type, doc_num, phone, email, address)
+VALUES (1, 'Consumidor Final', 'CC', '222222222222', '', '', '')
+ON DUPLICATE KEY UPDATE name=VALUES(name);
+
+-- 3. Extraer y migrar automáticamente todos los clientes únicos registrados en tus ventas pasadas
+INSERT IGNORE INTO customers (name, doc_type, doc_num, phone, email, address)
+SELECT DISTINCT 
+    customer_name, 
+    COALESCE(customer_doc_type, 'CC'), 
+    customer_doc_num, 
+    customer_phone, 
+    customer_email, 
+    customer_address
+FROM orders
+WHERE customer_doc_num IS NOT NULL 
+  AND customer_doc_num != '' 
+  AND customer_doc_num != '222222222222';
+
+-- 4. Agregar la columna customer_id a la tabla orders
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_id INT NULL AFTER user_id;
+
+-- 5. Vincular las órdenes antiguas con los IDs de la nueva tabla de clientes
+UPDATE orders o
+JOIN customers c ON o.customer_doc_num = c.doc_num
+SET o.customer_id = c.id
+WHERE o.customer_doc_num IS NOT NULL AND o.customer_doc_num != '';
+
+-- 6. Asignar ID 1 (Consumidor Final) a las órdenes que no tenían documento registrado
+UPDATE orders 
+SET customer_id = 1 
+WHERE customer_id IS NULL;
+
+
+...........todo hasta aqui cargado........versio 1.1

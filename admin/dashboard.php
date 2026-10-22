@@ -173,7 +173,8 @@ try {
     <a href="/mi_tienda/admin/gastos_list.php" class="quick-btn">📜 Lista de Gastos</a>
     <a href="/mi_tienda/admin/compras.php" class="quick-btn quick-btn-success">🛒 Ir a Compras</a>
     <a href="/mi_tienda/admin/permisos.php" class="quick-btn quick-btn-success">Ir a Permisos</a>
-
+    <a href="/mi_tienda/admin/gastos_administrativos.php" class="quick-btn quick-btn-success">Gastos Administrativos</a>
+    
 </div>
 
 <style>

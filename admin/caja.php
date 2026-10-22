@@ -5,7 +5,9 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 require_once __DIR__ . '/../includes/auth_functions.php';
 require_once __DIR__ . '/../includes/db.php';
@@ -16,8 +18,8 @@ $pdo = DB::getConnection();
 
 $currentBranchId   = $_SESSION['branch_id']   ?? null;
 $currentBranchName = $_SESSION['branch_name'] ?? null;
-$currentUserId     = $_SESSION['user']['id']  ?? null;
-$currentUserRole   = $_SESSION['user']['role_id'] ?? null; // rol del usuario
+$currentUserId     = $_SESSION['user']['id']  ?? $_SESSION['user_id'] ?? null;
+$currentUserRole   = $_SESSION['user']['role_id'] ?? $_SESSION['role_id'] ?? null;
 
 if (!$currentBranchId) {
     die("No hay sucursal seleccionada. Vuelva al dashboard.");
@@ -26,7 +28,6 @@ if (!$currentBranchId) {
 $msg = "";
 $diferencia = null;
 $action = $_POST['action'] ?? null;
-
 
 // --- Handler ack_report ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'ack_report')) {
@@ -40,15 +41,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'ack_report')) {
             ");
             $stmtAck->execute([$sessionId]);
         } catch (Exception $e) {
-            // opcional: loguear error
+            // Log opcional
         }
     }
-    // Redirigir para evitar reenvío del formulario
     header("Location: caja.php");
     exit;
 }
-// --- fin handler ack_report ---
-
 
 // --- Handler ack_print_order ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'ack_print_order')) {
@@ -62,14 +60,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'ack_print_order')) {
             ");
             $stmtAckOrder->execute([$orderId]);
         } catch (Exception $e) {
-            // opcional: loguear error
+            // Log opcional
         }
     }
     header("Location: caja.php");
     exit;
 }
-// --- fin handler ack_print_order ---
-
 
 // Detectar si se pasó un lastOrderId
 $lastOrderId = intval($_GET['last_order_id'] ?? $_POST['last_order_id'] ?? 0);
@@ -83,7 +79,7 @@ $stmt = $pdo->prepare("
 $stmt->execute([$currentUserId, $currentBranchId]);
 $currentSession = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// Preparar consulta para ventas por sesión (entre apertura y cierre)
+// Preparar consulta para ventas por sesión (excluye canceladas)
 $stmtVentasSesion = $pdo->prepare("
     SELECT COALESCE(SUM(total),0)
     FROM orders
@@ -92,24 +88,33 @@ $stmtVentasSesion = $pdo->prepare("
       AND created_at BETWEEN ? AND ?
 ");
 
-// Preparar consulta para pagos virtuales
+// Preparar consulta para pagos virtuales (excluye canceladas)
 $stmtVirtual = $pdo->prepare("
     SELECT COALESCE(SUM(p.amount),0) 
     FROM payments p
     JOIN orders o ON o.id = p.order_id
     WHERE p.method = 'virtual'
       AND p.status = 'completado'
+      AND o.status != 'cancelado'
       AND o.created_at BETWEEN ? AND ?
       AND o.branch_id = ?
 ");
 
-// --- NUEVO: gastos por sesión ---
+// Gastos por sesión
 $stmtGastos = $pdo->prepare("
     SELECT COALESCE(SUM(valor),0)
     FROM gastos g
     WHERE g.branch_id = ?
       AND CONCAT(g.fecha, ' ', g.hora) BETWEEN ? AND ?
-      AND g.anulado = 0
+      AND COALESCE(g.anulado, 0) = 0
+");
+
+// Compras por sesión (Sincronización con compras.php)
+$stmtCompras = $pdo->prepare("
+    SELECT COALESCE(SUM(total_amount),0)
+    FROM purchases
+    WHERE branch_id = ?
+      AND created_at BETWEEN ? AND ?
 ");
 
 // Variables para reporte
@@ -117,23 +122,7 @@ $reportSession = null;
 $reportVentas  = 0;
 $reportVirtualPayments = 0;
 $reportGastos = 0;
-
-
-
-
-
-
-
-
-
-
-
-
-// Variables para mostrar reporte después de cerrar
-$reportSession = null;
-$reportVentas  = 0;
-$reportVirtualPayments = 0;
-$reportGastos = 0;
+$reportCompras = 0;
 
 // --- Apertura ---
 if ($action === 'open' && !$currentSession) {
@@ -154,11 +143,9 @@ if ($action === 'open' && !$currentSession) {
 
 // --- Cierre ---
 if ($action === 'close' && $currentSession) {
-    // Tomar el monto de cierre enviado por el formulario
     $closing = floatval(str_replace('.', '', $_POST['closing_amount'] ?? 0));
-    $diferencia = $closing - $currentSession['opening_amount'];
+    $diferencia = $closing - (float)$currentSession['opening_amount'];
 
-    // Actualizar la sesión en la base de datos
     $stmt = $pdo->prepare("
         UPDATE cash_sessions
         SET closing_amount=?, closed_at=NOW(), status='cerrada'
@@ -166,7 +153,6 @@ if ($action === 'close' && $currentSession) {
     ");
     $stmt->execute([$closing, $currentSession['id']]);
 
-    // Recuperar la sesión actualizada para el reporte
     $stmt2 = $pdo->prepare("
         SELECT c.*, u.name AS user_name 
         FROM cash_sessions c 
@@ -176,38 +162,41 @@ if ($action === 'close' && $currentSession) {
     $stmt2->execute([$currentSession['id']]);
     $reportSession = $stmt2->fetch(PDO::FETCH_ASSOC);
 
-    // Calcular ventas dentro del rango de la sesión (apertura -> cierre)
     $openedAt = $reportSession['opened_at'];
     $closedAt = $reportSession['closed_at'] ?: date('Y-m-d H:i:s');
+
     $stmtVentasSesion->execute([$currentBranchId, $openedAt, $closedAt]);
     $reportVentas = (float)$stmtVentasSesion->fetchColumn();
 
-    // Calcular pagos virtuales dentro del rango
     $stmtVirtual->execute([$openedAt, $closedAt, $currentBranchId]);
     $reportVirtualPayments = (float)$stmtVirtual->fetchColumn();
 
-    // Calcular gastos dentro del rango
     $stmtGastos->execute([$currentBranchId, $openedAt, $closedAt]);
     $reportGastos = (float)$stmtGastos->fetchColumn();
 
+    $stmtCompras->execute([$currentBranchId, $openedAt, $closedAt]);
+    $reportCompras = (float)$stmtCompras->fetchColumn();
+
     $msg = "Caja cerrada correctamente. Generando reporte de cierre.";
-    // No redirigimos para que el cajero vea el reporte
 }
 
 // --- Re-ejecutar consultas de resumen si no hubo cierre ---
 $defaultOpenedAt = $currentSession['opened_at'] ?? date('Y-m-d H:i:s');
 $defaultClosedAt = $currentSession['closed_at'] ?? date('Y-m-d H:i:s');
 
-// Pagos virtuales
 $stmtVirtual->execute([$defaultOpenedAt, $defaultClosedAt, $currentBranchId]);
 if (empty($reportVirtualPayments)) {
     $reportVirtualPayments = (float)$stmtVirtual->fetchColumn();
 }
 
-// Gastos
 $stmtGastos->execute([$currentBranchId, $defaultOpenedAt, $defaultClosedAt]);
 if (empty($reportGastos)) {
     $reportGastos = (float)$stmtGastos->fetchColumn();
+}
+
+$stmtCompras->execute([$currentBranchId, $defaultOpenedAt, $defaultClosedAt]);
+if (empty($reportCompras)) {
+    $reportCompras = (float)$stmtCompras->fetchColumn();
 }
 
 // Ventas del día de esa sucursal
@@ -249,47 +238,44 @@ $sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
     th { background:#eee; }
     .msg { background:#dff0d8; padding:10px; border-radius:6px; margin-bottom:10px; }
     input { padding:6px; width:100%; box-sizing:border-box; }
-    button { padding:10px 15px; margin-top:10px; width:100%; }
+    button { padding:10px 15px; margin-top:10px; width:100%; cursor:pointer; }
     .report { background:#fff; padding:16px; border:1px solid #ccc; margin-top:20px; border-radius:6px; }
     .report h4 { margin:0 0 10px 0; }
     .report .row { display:flex; justify-content:space-between; margin-bottom:6px; }
-    .report .bold { font-weight:bold; }
 
-    /* Alternar "sombra" de color (azul/rojo) debajo de cada fila */
-table tbody tr { position:relative; }
-table tbody tr::after {
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: -1px;
-    height: 6px;
-    pointer-events: none;
-    border-radius: 0 0 4px 4px;
-}
-table tbody tr:nth-child(odd)::after {
-    background: rgba(0, 123, 255, 0.06); /* azul suave */
-}
-table tbody tr:nth-child(even)::after {
-    background: rgba(220, 53, 69, 0.06); /* rojo suave */
-}
+    table tbody tr { position:relative; }
+    table tbody tr::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: -1px;
+        height: 6px;
+        pointer-events: none;
+        border-radius: 0 0 4px 4px;
+    }
+    table tbody tr:nth-child(odd)::after {
+        background: rgba(0, 123, 255, 0.06);
+    }
+    table tbody tr:nth-child(even)::after {
+        background: rgba(220, 53, 69, 0.06);
+    }
 
-/* Ocultar columna ID en la vista (no mostrar al usuario) */
-.id-col { display:none; }
+    .id-col { display:none; }
 
-@media (max-width:768px) {
-    header { flex-direction:column; align-items:flex-start; }
-    .table { display:block; overflow-x:auto; white-space:nowrap; }
-    table { min-width:700px; }
-    .report .row { flex-direction:column; align-items:flex-start; }
-}
+    @media (max-width:768px) {
+        header { flex-direction:column; align-items:flex-start; }
+        .table { display:block; overflow-x:auto; white-space:nowrap; }
+        table { min-width:700px; }
+        .report .row { flex-direction:column; align-items:flex-start; }
+    }
 </style>
 </head>
 <body>
 <header>
     <h2>Caja / Arqueo</h2>
     <div class="branch">Sucursal actual: <strong><?= htmlspecialchars($currentBranchName) ?></strong></div>
-    <a href="/mi_tienda/admin/pos.php?mode=tactil">Atrás</a>
+    <a href="pos.php?mode=tactil" style="color:#fff;">Atrás</a>
 </header>
 
 <div class="container">
@@ -298,10 +284,9 @@ table tbody tr:nth-child(even)::after {
     <div class="msg"><?= htmlspecialchars($msg) ?></div>
 <?php endif; ?>
 
-<!-- BLOQUE NUEVO: mostrar opciones de impresión tras guardar una venta -->
 <?php if (!empty($lastOrderId)): ?>
     <div class="report" id="report-venta">
-        <h4>Venta #<?= htmlspecialchars($lastOrderId) ?> registrada</h4>
+        <h4>Venta #<?= htmlspecialchars((string)$lastOrderId) ?> registrada</h4>
         <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
             <button onclick="window.open('invoice_print.php?order_id=<?= $lastOrderId ?>','_blank','noopener')">Vista impresión</button>
             <button onclick="window.open('invoice_print.php?order_id=<?= $lastOrderId ?>&width=58','_blank','noopener')">Imprimir 58mm</button>
@@ -309,13 +294,12 @@ table tbody tr:nth-child(even)::after {
 
             <form method="POST" style="margin:0;">
                 <input type="hidden" name="action" value="ack_print_order">
-                <input type="hidden" name="order_id" value="<?= htmlspecialchars($lastOrderId) ?>">
+                <input type="hidden" name="order_id" value="<?= htmlspecialchars((string)$lastOrderId) ?>">
                 <button type="submit">No imprimir</button>
             </form>
         </div>
     </div>
 <?php endif; ?>
-<!-- FIN BLOQUE NUEVO -->
 
 <h3>Arqueo de Caja</h3>
 <p>Sucursal actual: <?= htmlspecialchars($currentBranchName) ?></p>
@@ -353,19 +337,16 @@ table tbody tr:nth-child(even)::after {
 </div>
 
 <script>
-// Formatear con puntos de mil
 function formatMiles(num) {
     return num.toLocaleString('es-CO');
 }
 
-// parseMiles elimina cualquier carácter no numérico
 function parseMiles(str) {
     if (!str) return 0;
     const digits = String(str).replace(/[^\d]/g, '');
     return parseInt(digits) || 0;
 }
 
-// Actualizar subtotales y total del arqueo
 function actualizarArqueo() {
     let total = 0;
     document.querySelectorAll(".den-input").forEach(input => {
@@ -380,7 +361,6 @@ function actualizarArqueo() {
     const totalSpan = document.getElementById("total-caja");
     if (totalSpan) totalSpan.textContent = formatMiles(total);
 
-    // Copiar el total al campo de apertura o cierre con formato
     let apertura = document.getElementById("opening_amount");
     let cierre   = document.getElementById("closing_amount");
     if (apertura) apertura.value = formatMiles(total);
@@ -390,7 +370,6 @@ function actualizarArqueo() {
     }
 }
 
-// Recalcular diferencia (UI del panel en cierre)
 function recalcularDiferencia() {
     const diffBox = document.getElementById("diff-box");
     if (!diffBox) return;
@@ -400,11 +379,8 @@ function recalcularDiferencia() {
     const cierreTexto = document.getElementById("closing_amount")?.value || "0";
     const cierre = parseMiles(cierreTexto);
 
-    // --- NUEVA LÓGICA ---
-    // Efectivo a retirar
     const valorRetirar = cierre - apertura;
 
-    // Obtener ventas, virtuales y gastos desde elementos (pueden estar ocultos)
     const ventasTexto = document.getElementById("ventas_sesion")?.textContent || "0";
     const ventas = parseMiles(ventasTexto);
 
@@ -414,8 +390,10 @@ function recalcularDiferencia() {
     const gastosTexto = document.getElementById("gastos_sesion")?.textContent || "0";
     const gastos = parseMiles(gastosTexto);
 
-    // Diferencia con la fórmula definida
-    const diferencia = valorRetirar + virtuales + gastos - ventas;
+    const comprasTexto = document.getElementById("compras_sesion")?.textContent || "0";
+    const compras = parseMiles(comprasTexto);
+
+    const diferencia = valorRetirar + virtuales + gastos + compras - ventas;
 
     const elA = document.getElementById("diff-apertura");
     const elC = document.getElementById("diff-cierre");
@@ -436,9 +414,7 @@ function recalcularDiferencia() {
     }
 }
 
-// --- Asignación de listeners dentro de DOMContentLoaded ---
 document.addEventListener("DOMContentLoaded", () => {
-    // Escuchar cambios y formatear inputs de denominaciones
     document.querySelectorAll(".den-input").forEach(input => {
         input.addEventListener("input", function(e) {
             let raw = (e.target.value || '').replace(/\./g,'');
@@ -447,7 +423,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    // Escuchar cambios en apertura/cierre para recalcular diferencia
     ["opening_amount","closing_amount"].forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -459,7 +434,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Inicializar al cargar
     actualizarArqueo();
     recalcularDiferencia();
 });
@@ -467,21 +441,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
 <div style="margin-top:18px;"></div>
 
-<?php if ($msg): ?>
-    <div class="msg"><?= htmlspecialchars($msg) ?></div>
-<?php endif; ?>
-
 <h3>Estado actual</h3>
 
 <?php if ($currentUserRole == 1): ?> 
-    <!-- Solo visible para administrador -->
-    <p><strong>Ventas de hoy:</strong> $<?= number_format($todaySales, 0, ",", ".") ?></p>
+    <p><strong>Ventas de hoy:</strong> $<?= number_format((float)$todaySales, 0, ",", ".") ?></p>
 <?php endif; ?>
 
 <?php if ($currentSession): ?>
     <p><strong>Caja abierta por ti:</strong> 
-        Apertura: <span id="apertura_ref">$<?= number_format($currentSession['opening_amount'],0,",",".") ?></span>
-        el <?= $currentSession['opened_at'] ?>
+        Apertura: <span id="apertura_ref">$<?= number_format((float)$currentSession['opening_amount'],0,",",".") ?></span>
+        el <?= htmlspecialchars($currentSession['opened_at']) ?>
     </p>
 
     <!-- Formulario de Cierre -->
@@ -495,7 +464,7 @@ document.addEventListener("DOMContentLoaded", () => {
     <!-- Panel de diferencia/descudre -->
     <div id="diff-box" style="margin-top:15px; padding:12px; border:1px solid #ddd; border-radius:8px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <strong>Diferencia / Descudre (cierre - apertura)</strong>
+            <strong>Diferencia / Descuadre (cierre - apertura)</strong>
             <span id="diff-badge"></span>
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
@@ -519,16 +488,14 @@ document.addEventListener("DOMContentLoaded", () => {
 if ($reportSession):
     $rep = $reportSession;
 
-    // Efectivo a retirar
     $valor_retirar = (float)$rep['closing_amount'] - (float)$rep['opening_amount'];
 
-    // Asegurar tipos numéricos
     $reportVentas = (float)$reportVentas;
     $reportVirtualPayments = (float)$reportVirtualPayments;
     $reportGastos = (float)$reportGastos;
+    $reportCompras = (float)$reportCompras;
 
-    // Nueva lógica de diferencia
-    $difference = $valor_retirar + $reportVirtualPayments + $reportGastos - $reportVentas;
+    $difference = $valor_retirar + $reportVirtualPayments + $reportGastos + $reportCompras - $reportVentas;
 ?>
 <style>
     .excel-table {
@@ -553,35 +520,35 @@ if ($reportSession):
 </style>
 
 <div class="report" id="report-cierre">
-    <h4>Reporte de Cierre - Caja #<?= htmlspecialchars($rep['id']) ?></h4>
+    <h4>Reporte de Cierre - Caja #<?= htmlspecialchars((string)$rep['id']) ?></h4>
 
     <table class="excel-table">
         <tr><th>Usuario</th><td><?= htmlspecialchars($rep['user_name']) ?></td></tr>
         <tr><th>Sucursal</th><td><?= htmlspecialchars($currentBranchName) ?></td></tr>
-        <tr><th>Apertura registrada</th><td>$<?= number_format($rep['opening_amount'],0,",",".") ?> (<?= $rep['opened_at'] ?>)</td></tr>
-        <tr><th>Cierre contado</th><td>$<?= number_format($rep['closing_amount'],0,",",".") ?> (<?= $rep['closed_at'] ?>)</td></tr>
+        <tr><th>Apertura registrada</th><td>$<?= number_format((float)$rep['opening_amount'],0,",",".") ?> (<?= htmlspecialchars($rep['opened_at']) ?>)</td></tr>
+        <tr><th>Cierre contado</th><td>$<?= number_format((float)$rep['closing_amount'],0,",",".") ?> (<?= htmlspecialchars($rep['closed_at']) ?>)</td></tr>
         <tr><th>Valor a retirar</th><td>$<?= number_format($valor_retirar,0,",",".") ?></td></tr>
         <tr><th>Ventas en la sesión</th><td>$<?= number_format($reportVentas,0,",",".") ?></td></tr>
         <tr><th>Ventas virtuales en la sesión</th><td>$<?= number_format($reportVirtualPayments,0,",",".") ?></td></tr>
         <tr><th>Gastos en la sesión</th><td>$<?= number_format($reportGastos,0,",",".") ?></td></tr>
-        <tr><th>Diferencia (efectivo + virtuales + gastos - ventas)</th>
+        <tr><th>Compras en la sesión</th><td>$<?= number_format($reportCompras,0,",",".") ?></td></tr>
+        <tr><th>Diferencia (efectivo + virtuales + gastos + compras - ventas)</th>
             <td><?= ($difference >= 0 ? '+' : '-') . '$' . number_format(abs($difference),0,",",".") ?></td></tr>
     </table>
 
-    <!-- Valores ocultos para que el JS pueda leerlos y calcular la misma diferencia en el panel -->
     <div style="display:none;">
         <span id="ventas_sesion"><?= number_format($reportVentas,0,",",".") ?></span>
         <span id="ventas_virtuales"><?= number_format($reportVirtualPayments,0,",",".") ?></span>
         <span id="gastos_sesion"><?= number_format($reportGastos,0,",",".") ?></span>
+        <span id="compras_sesion"><?= number_format($reportCompras,0,",",".") ?></span>
     </div>
 
     <div style="margin-top:12px; display:flex; gap:8px;">
-        <!-- Botón para imprimir -->
         <button onclick="window.open('<?= htmlspecialchars('invoice_print.php?session_id='.$rep['id'].'&width=58') ?>','_blank','noopener')">Imprimir</button>
 
         <form method="POST" style="margin:0;">
             <input type="hidden" name="action" value="ack_report">
-            <input type="hidden" name="session_id" value="<?= htmlspecialchars($rep['id']) ?>">
+            <input type="hidden" name="session_id" value="<?= htmlspecialchars((string)$rep['id']) ?>">
             <button type="submit">Confirmar reporte</button>
         </form>
     </div>
@@ -590,7 +557,6 @@ if ($reportSession):
 
 <?php else: ?>
     <p>No tienes una caja abierta actualmente.</p>
-    <!-- Formulario de Apertura -->
     <form method="POST">
         <input type="hidden" name="action" value="open">
         <label>Monto de apertura:</label>
@@ -599,10 +565,7 @@ if ($reportSession):
     </form>
 <?php endif; ?>
 
-<?php
-// Mostrar "Últimas cajas" solo a administradores (role_id == 1).
-if ($currentUserRole == 1):
-?>
+<?php if ($currentUserRole == 1): ?>
     <h3>Últimas cajas de esta sucursal</h3>
     <table class="table">
         <thead>
@@ -616,38 +579,37 @@ if ($currentUserRole == 1):
                 <th>Cerrada</th>
                 <th>Ventas</th>
                 <th>Gastos</th>
+                <th>Compras</th>
                 <th>Diferencia</th>
                 <th>Valor a Retirar</th>
             </tr>
         </thead>
-            <tbody>
+        <tbody>
             <?php foreach ($sessions as $s): ?>
             <?php
                 $openedAt = $s['opened_at'];
                 $closedAt = $s['closed_at'] ?: date('Y-m-d H:i:s');
 
-                // Ventas en la sesión
                 $stmtVentasSesion->execute([$currentBranchId, $openedAt, $closedAt]);
                 $ventasSesion = (float)$stmtVentasSesion->fetchColumn();
 
-                // Pagos virtuales en la sesión (solo para mostrar)
                 $stmtVirtual->execute([$openedAt, $closedAt, $currentBranchId]);
                 $virtualSesion = (float)$stmtVirtual->fetchColumn();
 
-                // Gastos en la sesión
                 $stmtGastos->execute([$currentBranchId, $openedAt, $closedAt]);
                 $gastosSesion = (float)$stmtGastos->fetchColumn();
 
-                // Valor a retirar por sesión
+                $stmtCompras->execute([$currentBranchId, $openedAt, $closedAt]);
+                $comprasSesion = (float)$stmtCompras->fetchColumn();
+
                 $withdrawSesion = null;
                 if ($s['closing_amount'] !== null) {
                     $withdrawSesion = (float)$s['closing_amount'] - (float)$s['opening_amount'];
                 }
 
-                // Calcular diferencia con la nueva lógica
                 $diff = null;
                 if ($s['closing_amount'] !== null) {
-                    $diff = $withdrawSesion + $virtualSesion + $gastosSesion - $ventasSesion;
+                    $diff = $withdrawSesion + $virtualSesion + $gastosSesion + $comprasSesion - $ventasSesion;
                 }
 
                 $diffTexto = ($diff === null) ? '-' : (($diff >= 0 ? '+' : '-') . '$' . number_format(abs($diff), 0, ",", "."));
@@ -656,24 +618,21 @@ if ($currentUserRole == 1):
             <tr>
                 <td class="id-col"><?= $s['id'] ?></td>
                 <td><?= htmlspecialchars($s['user_name']) ?></td>
-                <td>$<?= number_format($s['opening_amount'], 0, ",", ".") ?></td>
-                <td><?= $s['closing_amount'] !== null ? '$'.number_format($s['closing_amount'], 0, ",", ".") : '-' ?></td>
+                <td>$<?= number_format((float)$s['opening_amount'], 0, ",", ".") ?></td>
+                <td><?= $s['closing_amount'] !== null ? '$'.number_format((float)$s['closing_amount'], 0, ",", ".") : '-' ?></td>
                 <td><?= htmlspecialchars($s['status']) ?></td>
-                <td><?= $s['opened_at'] ?></td>
-                <td><?= $s['closed_at'] ?: '-' ?></td>
+                <td><?= htmlspecialchars($s['opened_at']) ?></td>
+                <td><?= htmlspecialchars($s['closed_at'] ?: '-') ?></td>
                 <td><?= '$' . number_format($ventasSesion, 0, ",", ".") ?></td>
                 <td><?= '$' . number_format($gastosSesion, 0, ",", ".") ?></td>
+                <td><?= '$' . number_format($comprasSesion, 0, ",", ".") ?></td>
                 <td><?= $diffTexto ?></td>
                 <td><?= $withdrawTexto ?></td>
             </tr>
             <?php endforeach; ?>
         </tbody>
-
-
     </table>
-<?php
-endif; // fin condicional de rol
-?>
+<?php endif; ?>
 </div>
 </body>
 </html>

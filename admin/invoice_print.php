@@ -1,27 +1,5 @@
 <?php
-// ========================================================================================================
-// SCRIPT: admin/invoice_print.php
-// --------------------------------------------------------------------------------------------------------
-// DESCRIPCIÓN Y FUNCIONAMIENTO GENERAL DEL CÓDIGO:
-// 1. Configuración del entorno: Habilita la visualización de errores PHP para facilitar la depuración,
-//    inicia la sesión PHP y carga los archivos de autenticación y conexión a base de datos (PDO).
-// 2. Sincronización de Zona Horaria (PHP y MySQL): Configura la zona horaria predeterminada en PHP
-//    ('America/Bogota') y calcula dinámicamente el desfase (offset) para enviarlo a MySQL mediante
-//    "SET time_zone". Esto asegura que las marcas de tiempo (TIMESTAMP, created_at, NOW()) coincidan.
-// 3. Carga de datos de la empresa: Consulta la tabla 'settings' para obtener el nombre de la empresa,
-//    NIT, dirección, teléfono, logo y leyenda por defecto.
-// 4. Módulo Reimpresión de Gasto (gasto_id): Si se recibe 'gasto_id', carga la información del gasto,
-//    valida permisos según la sucursal del usuario, personaliza el encabezado con los datos de dicha sucursal,
-//    genera la tirilla HTML de impresión y guarda el HTML generado en la base de datos (si existe la columna).
-// 5. Módulo Reimpresión de Compra a Proveedor (purchase_id): Consulta la cabecera 'purchases' y sus detalles
-//    'purchase_items' haciendo JOIN con 'products' para obtener el nombre real del producto y 'total_units'
-//    como la cantidad comprada. Renderiza el comprobante térmico con temporizador de autoprint.
-// 6. Módulo Reporte de Cierre de Caja (session_id / closureId): Procesa reportes de cierre de sesión de caja,
-//    calculando aperturas, cierres, ventas en efectivo, ventas virtuales, gastos acumulados y diferencias.
-// 7. Módulo Factura de Venta (order_id): Carga la orden y sus ítems asociados desde 'order_items' y 'products',
-//    calcula impuestos, desglose de pagos (efectivo, virtual, cambio), genera un código QR y construye la tirilla.
-// ========================================================================================================
-
+// admin/invoice_print.php
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
@@ -33,29 +11,15 @@ require_once __DIR__ . '/../includes/db.php';
 
 $pdo = DB::getConnection();
 
-// =================================================================
-// --- INICIO: SINCRONIZACIÓN DE HORA (SOLUCIÓN AL DILEMA) ---
-// =================================================================
-
-// 1. Establecer la zona horaria en PHP.
-// CAMBIA ESTO según tu país. Ejemplos:
-// Colombia/México/Perú: 'America/Bogota'
-// Argentina/Chile/Paraguay: 'America/Argentina/Buenos_Aires' o 'America/Santiago'
-// España: 'Europe/Madrid'
+// --- Sincronización de Zona Horaria ---
 date_default_timezone_set('America/Bogota'); 
 
-// 2. Sincronizar MySQL con la zona horaria de PHP.
-// Calculamos el desfase (ej. -05:00) y se lo enviamos a MySQL.
-// Esto hace que las columnas TIMESTAMP (como created_at) y la función NOW() 
-// se conviertan automáticamente a tu hora local.
 $fecha = new DateTime();
-$offset = $fecha->format('P'); // Obtiene formato +/-HH:MM
+$offset =$fecha->format('P');
 
 try {
     $pdo->exec("SET time_zone = '$offset';");
-} catch (Exception $e) {
-    // Si falla, continuamos, pero es raro que falle.
-}
+} catch (Exception $e) {}
 
 // --- Cargar configuración de la empresa desde settings si existe ---
 $company = [
@@ -68,7 +32,7 @@ $company = [
 ];
 
 try {
-    $stmtSet = $pdo->prepare("SELECT `key`, `value` FROM settings WHERE `key` IN ('company_name','company_nit','company_address','company_legend','company_logo','company_phone') ");
+    $stmtSet =$pdo->prepare("SELECT `key`, `value` FROM settings WHERE `key` IN ('company_name','company_nit','company_address','company_legend','company_logo','company_phone') ");
     $stmtSet->execute();
     $rows = $stmtSet->fetchAll(PDO::FETCH_ASSOC);
     foreach ($rows as $r) {
@@ -91,16 +55,21 @@ $purchaseId = isset($_GET['purchase_id']) ? intval($_GET['purchase_id']) : 0;
 
 $cart = [];
 $invoiceData = [
-    'number'   => date('YmdHis'),
-    'date'     => date('Y-m-d H:i:s'),
-    'cashier'  => $_SESSION['user']['name'] ?? 'Cajero',
-    'customer' => ''
+    'number'           => date('YmdHis'),
+    'date'             => date('Y-m-d H:i:s'),
+    'cashier'          => $_SESSION['user']['name'] ?? 'Cajero',
+    'customer_name'    => 'Consumidor Final',
+    'customer_doc_type'=> 'CC',
+    'customer_doc_num' => '222222222222',
+    'customer_phone'   => '',
+    'customer_email'   => '',
+    'customer_address' => ''
 ];
 
 $branchIdForQr = null;
 
 /* ===========================================================
-   BLOQUE ADICIONAL: Reimprimir Gasto
+   BLOQUE: Reimprimir Gasto
    =========================================================== */
 if ($gastoId > 0) {
     $stmt = $pdo->prepare("
@@ -119,14 +88,11 @@ if ($gastoId > 0) {
         exit;
     }
 
-    // Seguridad: permitir solo reimprimir gastos de la misma sucursal (salvo admin)
     if (($g['branch_id'] ?? null) != ($_SESSION['branch_id'] ?? null) && ($_SESSION['user']['role_id'] ?? 0) != 1) {
         echo "Acceso denegado.";
         exit;
     }
 
-    // --- Cargar datos de la sucursal para el encabezado de la tirilla de gasto ---
-    $branchForGasto = null;
     if (!empty($g['branch_id'])) {
         try {
             $stmtBranchG = $pdo->prepare("SELECT * FROM branches WHERE id = ? LIMIT 1");
@@ -145,7 +111,6 @@ if ($gastoId > 0) {
 
     $fmt = function($v){ return '$' . number_format(floatval($v), 0, ",", "."); };
 
-    // Generar HTML de reimpresión de gasto
     ob_start();
     ?>
     <!doctype html>
@@ -191,7 +156,7 @@ if ($gastoId > 0) {
         <?php endif; ?>
         <?php if (!empty($g['anulado'])): ?>
         <div class="sep"></div>
-        <div class="center" style="color:#b00020;">GASTO ANULADO</div>
+        <div class="center" style="color:#b00020; font-size:14px; border:2px solid #b00020; padding:4px;">*** GASTO ANULADO ***</div>
         <?php endif; ?>
         <div class="sep"></div>
         <div class="center">Gracias</div>
@@ -215,10 +180,9 @@ if ($gastoId > 0) {
 }
 
 /* ===========================================================
-   BLOQUE ADICIONAL: Reimprimir / Imprimir Compra a Proveedor
+   BLOQUE: Reimprimir / Imprimir Compra a Proveedor
    =========================================================== */
 if ($purchaseId > 0) {
-    // Consulta de la cabecera de la compra
     $stmtP = $pdo->prepare("
         SELECT p.*, 
                u.name AS usuario_nombre, 
@@ -259,7 +223,6 @@ if ($purchaseId > 0) {
         } catch (Exception $e) {}
     }
 
-    // Cargar los detalles de la compra cruzando purchase_items con products
     $purchaseItems = [];
     try {
         $stmtPI = $pdo->prepare("
@@ -327,7 +290,6 @@ if ($purchaseId > 0) {
         <table class="items" style="font-size:10px;">
             <tbody>
             <?php foreach ($purchaseItems as $pi): 
-                // Extrae total_units (o qty_purchased) y calcula importes
                 $qty = floatval($pi['total_units'] ?? $pi['qty_purchased'] ?? 1);
                 $unit = floatval($pi['unit_cost'] ?? 0);
                 $lineTotal = floatval($pi['line_total'] ?? ($qty * $unit));
@@ -370,7 +332,7 @@ if ($purchaseId > 0) {
 }
 
 /* ===========================================================
-   BLOQUE ADICIONAL: Reporte de Cierre de Caja
+   BLOQUE: Reporte de Cierre de Caja
    =========================================================== */
 $closureId = isset($_GET['session_id']) ? intval($_GET['session_id']) : 0;
 if ($closureId > 0) {
@@ -409,7 +371,6 @@ if ($closureId > 0) {
                 $company['phone']   = $branchForClosure['phone'] ?? $company['phone'];
                 $company['logo']    = $branchForClosure['company_logo'] ?? $company['logo'];
                 $company['legend']  = $branchForClosure['invoice_legend'] ?? $company['legend'];
-                $taxRate = isset($branchForClosure['tax_rate']) ? floatval($branchForClosure['tax_rate']) : 0.0;
             }
         } catch (Exception $e) {}
     }
@@ -424,7 +385,7 @@ if ($closureId > 0) {
     $stmt = $pdo->prepare("
       SELECT COALESCE(SUM(p.amount),0) FROM payments p
       INNER JOIN orders o ON o.id = p.order_id
-      WHERE o.branch_id = ? AND p.method = 'virtual' AND p.status = 'completado' AND o.created_at BETWEEN ? AND ?
+      WHERE o.branch_id = ? AND p.method != 'efectivo' AND p.status = 'completado' AND o.created_at BETWEEN ? AND ?
     ");
     $stmt->execute([$c['branch_id'], $opening_at, $closing_at]);
     $sales_virtual = floatval($stmt->fetchColumn());
@@ -434,10 +395,20 @@ if ($closureId > 0) {
       FROM gastos g
       WHERE g.branch_id = ? 
         AND CONCAT(g.fecha, ' ', g.hora) BETWEEN ? AND ?
-        AND g.anulado = 0
+        AND COALESCE(g.anulado, 0) = 0
     ");
     $stmt->execute([$c['branch_id'], $opening_at, $closing_at]);
     $sales_expenses = floatval($stmt->fetchColumn());
+
+    // --- NUEVO: Consulta de Compras durante la Sesión ---
+    $stmt = $pdo->prepare("
+      SELECT COALESCE(SUM(total_amount),0) 
+      FROM purchases
+      WHERE branch_id = ? 
+        AND purchase_date BETWEEN DATE(?) AND DATE(?)
+    ");
+    $stmt->execute([$c['branch_id'], $opening_at, $closing_at]);
+    $sales_purchases = floatval($stmt->fetchColumn());
 
     $opening_amount = floatval($c['opening_amount'] ?? 0);
     $closing_amount = floatval($c['closing_amount'] ?? 0);
@@ -448,7 +419,8 @@ if ($closureId > 0) {
     $opening_display = htmlspecialchars($opening_at);
     $closing_display = htmlspecialchars($closing_at);
 
-    $difference = $withdraw_amount + $sales_virtual + $sales_expenses - $sales_total;
+    // --- FÓRMULA ACTUALIZADA CON COMPRAS ---
+    $difference = $withdraw_amount + $sales_virtual + $sales_expenses + $sales_purchases - $sales_total;
 
     ob_start();
     ?>
@@ -472,10 +444,8 @@ if ($closureId > 0) {
         .label{flex:1;color:#000;font-size:12px;font-weight:700;}
         .value{flex:1;text-align:right;font-weight:900;color:#000;}
         .small{font-size:var(--small);color:#000;font-weight:900;}
-        .muted{font-size:11px;color:#000;margin-top:4px;font-weight:700;}
 
         .meta{display:flex;flex-direction:column;gap:2px;font-size:11px;color:#000;margin-top:6px;font-weight:900;}
-        .meta .time{color:#000;font-size:10px;font-weight:900;}
 
         .wrap{white-space:normal;word-break:break-word;font-weight:700;color:#000;}
         .center{ text-align:center;font-weight:800;color:#000; }
@@ -491,7 +461,7 @@ if ($closureId > 0) {
           <div style="text-align:center;margin-bottom:6px;"><img src="<?= htmlspecialchars($company['logo']) ?>" alt="Logo" style="max-width:160px;max-height:60px;"></div>
         <?php endif; ?>
         <div class="title"><?= htmlspecialchars($company['name']) ?></div>
-        <div class="subtitle small">NIT: <?= htmlspecialchars($company['nit']) ?> - <?= htmlspecialchars($company['address']) ?></div>
+        <div class="subtitle small">NIT: <?= htmlspecialchars($company['nit']) ?><br><?= htmlspecialchars($company['address']) ?></div>
         <?php if (!empty($company['phone'])): ?>
           <div class="center small">Tel: <?= htmlspecialchars($company['phone']) ?></div>
         <?php endif; ?>
@@ -527,13 +497,14 @@ if ($closureId > 0) {
         <div class="row"><div class="label">Valor a retirar</div><div class="value"><?= $fmt($withdraw_amount) ?></div></div>
 
         <div class="row"><div class="label">Ventas en la sesión</div><div class="value"><?= $fmt($sales_total) ?></div></div>
-        <div class="row"><div class="label">Ventas virtuales en la sesión</div><div class="value"><?= $fmt($sales_virtual) ?></div></div>
+        <div class="row"><div class="label">Ventas electrónicas/no ef.</div><div class="value"><?= $fmt($sales_virtual) ?></div></div>
         <div class="row"><div class="label">Gastos en la sesión</div><div class="value"><?= $fmt($sales_expenses) ?></div></div>
+        <div class="row"><div class="label">Compras en la sesión</div><div class="value"><?= $fmt($sales_purchases) ?></div></div>
 
         <div class="sep"></div>
 
         <div class="row">
-          <div class="label">Diferencia (efectivo + virtuales + gastos - ventas)</div>
+          <div class="label">Diferencia</div>
           <div class="value"><?= ($difference >= 0 ? '+' : '-') . $fmt(abs($difference)) ?></div>
         </div>
 
@@ -546,17 +517,6 @@ if ($closureId > 0) {
           </div>
         </div>
       </div>
-
-      <script>
-        (function(){
-          try {
-            var ticket = document.querySelector('.ticket');
-            if (ticket && ticket.scrollHeight > 1200) {
-              ticket.style.fontSize = '11px';
-            }
-          } catch(e){}
-        })();
-      </script>
     </body>
     </html>
     <?php
@@ -564,9 +524,9 @@ if ($closureId > 0) {
     $html = ob_get_clean();
 
     try {
-        if (!empty($closureId) &&$closureId > 0) {
-            $stmtSave =$pdo->prepare("UPDATE cash_sessions SET printed_invoice_html = ?, printed_at = NOW() WHERE id = ?");
-            $stmtSave->execute([$html,$closureId]);
+        if (!empty($closureId) && $closureId > 0) {
+            $stmtSave = $pdo->prepare("UPDATE cash_sessions SET printed_invoice_html = ?, printed_at = NOW() WHERE id = ?");
+            $stmtSave->execute([$html, $closureId]);
         }
     } catch (Exception $e) {}
 
@@ -574,35 +534,66 @@ if ($closureId > 0) {
     exit;
 }
 
-// --- Cargar orden si existe ---
+/* ===========================================================
+   BLOQUE: Cargar e Imprimir Orden de Venta
+   =========================================================== */
+$orderRow = false;
 if ($orderId > 0) {
     try {
-        $stmtO =$pdo->prepare("SELECT id, total, created_at, COALESCE(customer_name,'') AS customer_name, branch_id, user_id FROM orders WHERE id = ? LIMIT 1");
+        $stmtO = $pdo->prepare("
+            SELECT o.id, o.total, o.created_at, o.branch_id, o.user_id,
+                   COALESCE(o.customer_name, 'Consumidor Final') AS customer_name,
+                   COALESCE(o.customer_doc_type, 'CC') AS customer_doc_type,
+                   COALESCE(o.customer_doc_num, '') AS customer_doc_num,
+                   COALESCE(o.customer_phone, '') AS customer_phone,
+                   COALESCE(o.customer_email, '') AS customer_email,
+                   COALESCE(o.customer_address, '') AS customer_address,
+                   o.status, o.cancelled_at, o.cancel_reason, o.replacement_order, 
+                   u_cashier.name AS cashier_name, u_canc.name AS cancelled_by_name
+            FROM orders o
+            LEFT JOIN users u_cashier ON u_cashier.id = o.user_id
+            LEFT JOIN users u_canc ON u_canc.id = o.cancelled_by
+            WHERE o.id = ? 
+            LIMIT 1
+        ");
         $stmtO->execute([$orderId]);
-        $orderRow =$stmtO->fetch(PDO::FETCH_ASSOC);
-    } catch (Exception $e) {$orderRow = false;
+        $orderRow = $stmtO->fetch(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        $orderRow = false;
     }
 
-    if ($orderRow) {$invoiceData['number']  = 'O' . $orderRow['id'];$invoiceData['date']    = $orderRow['created_at'];$invoiceData['customer']= $orderRow['customer_name'] ?:$invoiceData['customer'];
-        $branchIdForQr =$orderRow['branch_id'] ?? null;
+    if ($orderRow) {
+        $invoiceData['number']           = 'O' . $orderRow['id'];
+        $invoiceData['date']             = $orderRow['created_at'];
+        $invoiceData['cashier']          = $orderRow['cashier_name'] ?: $invoiceData['cashier'];
+        $invoiceData['customer_name']    = $orderRow['customer_name'];
+        $invoiceData['customer_doc_type']= $orderRow['customer_doc_type'];
+        $invoiceData['customer_doc_num'] = $orderRow['customer_doc_num'];
+        $invoiceData['customer_phone']   = $orderRow['customer_phone'];
+        $invoiceData['customer_email']   = $orderRow['customer_email'];
+        $invoiceData['customer_address'] = $orderRow['customer_address'];
+        $branchIdForQr                   = $orderRow['branch_id'] ?? null;
 
         if (!empty($branchIdForQr)) {
             try {
-                $stmtBranchO =$pdo->prepare("SELECT * FROM branches WHERE id = ? LIMIT 1");
+                $stmtBranchO = $pdo->prepare("SELECT * FROM branches WHERE id = ? LIMIT 1");
                 $stmtBranchO->execute([$branchIdForQr]);
-                $branchForOrder =$stmtBranchO->fetch(PDO::FETCH_ASSOC);
+                $branchForOrder = $stmtBranchO->fetch(PDO::FETCH_ASSOC);
                 if ($branchForOrder) {
-                    $company['name']    =$branchForOrder['name'] ?? $company['name'];$company['nit']     = $branchForOrder['nit'] ?? $company['nit'];
-                    $company['address'] =$branchForOrder['address'] ?? $company['address'];$company['phone']   = $branchForOrder['phone'] ?? $company['phone'];
-                    $company['logo']    =$branchForOrder['company_logo'] ?? $company['logo'];$company['legend']  = $branchForOrder['invoice_legend'] ?? $company['legend'];
-                    $taxRate = isset($branchForOrder['tax_rate']) ? floatval($branchForOrder['tax_rate']) : 0.0;
+                    $company['name']    = $branchForOrder['name'] ?? $company['name'];
+                    $company['nit']     = $branchForOrder['nit'] ?? $company['nit'];
+                    $company['address'] = $branchForOrder['address'] ?? $company['address'];
+                    $company['phone']   = $branchForOrder['phone'] ?? $company['phone'];
+                    $company['logo']    = $branchForOrder['company_logo'] ?? $company['logo'];
+                    $company['legend']  = $branchForOrder['invoice_legend'] ?? $company['legend'];
+                    $taxRate            = isset($branchForOrder['tax_rate']) ? floatval($branchForOrder['tax_rate']) : 0.0;
                 }
-            } catch (Exception$e) {}
+            } catch (Exception $e) {}
         }
 
         $items = [];
         try {
-            $stmtItems =$pdo->prepare("
+            $stmtItems = $pdo->prepare("
                 SELECT 
                     oi.id,
                     oi.order_id,
@@ -616,11 +607,13 @@ if ($orderId > 0) {
                 WHERE oi.order_id = ?
             ");
             $stmtItems->execute([$orderId]);
-            $items =$stmtItems->fetchAll(PDO::FETCH_ASSOC);
-        } catch (Exception $e) {$items = [];
+            $items = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            $items = [];
         }
 
-        if (empty($items)) {$items[] = [
+        if (empty($items)) {
+            $items[] = [
                 'product_name' => "Venta #{$orderRow['id']}",
                 'qty' => 1,
                 'unit_price' => floatval($orderRow['total']),
@@ -629,24 +622,26 @@ if ($orderId > 0) {
             ];
         }
 
-        foreach ($items as $it) {$cart[] = [
-                'qty' => intval($it['qty'] ?? 1),
-                'code' => isset($it['product_id']) ? (string)$it['product_id'] : '',
-                'name' => $it['product_name'] ?? 'Producto',
+        foreach ($items as $it) {
+            $cart[] = [
+                'qty'        => intval($it['qty'] ?? 1),
+                'code'       => isset($it['product_id']) ? (string)$it['product_id'] : '',
+                'name'       => $it['product_name'] ?? 'Producto',
                 'unit_price' => floatval($it['unit_price'] ?? ($it['line_total'] ?? 0))
             ];
         }
     }
 }
 
-// --- Ajuste: cargar datos de la sucursal desde branches si existe branchIdForQr ---
+// --- Cargar datos de la sucursal desde branches si existe branchIdForQr ---
 $taxRate = 0.0;
 if ($branchIdForQr) {
     try {
-        $stmtBranch =$pdo->prepare("SELECT * FROM branches WHERE id = ?");
+        $stmtBranch = $pdo->prepare("SELECT * FROM branches WHERE id = ?");
         $stmtBranch->execute([$branchIdForQr]);
-        $branch =$stmtBranch->fetch(PDO::FETCH_ASSOC);
-        if ($branch) {$company = [
+        $branch = $stmtBranch->fetch(PDO::FETCH_ASSOC);
+        if ($branch) {
+            $company = [
                 'name'    => $branch['name'] ?? $company['name'],
                 'nit'     => $branch['nit'] ?? $company['nit'],
                 'address' => $branch['address'] ?? $company['address'],
@@ -654,45 +649,64 @@ if ($branchIdForQr) {
                 'legend'  => $branch['invoice_legend'] ?? $company['legend'],
                 'logo'    => $branch['company_logo'] ?? $company['logo']
             ];
-            $taxRate = isset($branch['tax_rate']) ? floatval($branch['tax_rate']) :$taxRate;
+            $taxRate = isset($branch['tax_rate']) ? floatval($branch['tax_rate']) : $taxRate;
         }
     } catch (Exception $e) {}
 }
 
 // --- Items y totales ---
-$itemsHtml = '';$subtotal  = 0;
-foreach ($cart as $it) {$qty = intval($it['qty']);$name = htmlspecialchars($it['name'] ?? '');$unit = floatval($it['unit_price']);$lineTotal = $qty * $unit;
-    $subtotal +=$lineTotal;
-    $nameShort = (mb_strlen($name) > 28) ? mb_substr($name, 0, 25) . '...' :$name;
+$itemsHtml = '';
+$subtotal  = 0;
+foreach ($cart as $it) {
+    $qty       = intval($it['qty']);
+    $name      = htmlspecialchars($it['name'] ?? '');
+    $unit      = floatval($it['unit_price']);
+    $lineTotal = $qty * $unit;
+    $subtotal  += $lineTotal;
+    $nameShort = (mb_strlen($name) > 28) ? mb_substr($name, 0, 25) . '...' : $name;
     $itemsHtml .= "<tr><td>{$qty}x</td><td>{$nameShort}</td><td style='text-align:right;'>$" . number_format($lineTotal, 0, ",", ".") . "</td></tr>";
 }
-$tax = round($subtotal * $taxRate);$total = $subtotal +$tax;
+$tax   = round($subtotal * $taxRate);
+$total = $subtotal + $tax;
 
-// --- Pagos ---
-$cashReceived    = 0.0;
-$virtualReceived = 0.0;
-$changeGiven     = 0.0;
+// --- Detección y Carga de Todos los Métodos de Pago ---
+$paymentsList = [];
+$totalPaid = 0.0;
+$changeGiven = 0.0;
 
 if ($orderId > 0) {
     try {
-        $stmtPay =$pdo->prepare("
+        $stmtPay = $pdo->prepare("
             SELECT method, amount, cash_received, change_given 
             FROM payments 
             WHERE order_id = ?
         ");
         $stmtPay->execute([$orderId]);
-        foreach ($stmtPay->fetchAll(PDO::FETCH_ASSOC) as$r) {
-            if (($r['method'] ?? '') === 'efectivo') {$cashReceived = floatval($r['cash_received'] ?? $r['amount'] ?? 0);
-                $changeGiven  = floatval($r['change_given'] ?? 0);
+        $payRows = $stmtPay->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($payRows as $r) {
+            $methodKey = strtolower(trim($r['method'] ?? 'efectivo'));
+            $amount = floatval($r['amount'] ?? 0);
+            $cReceived = floatval($r['cash_received'] ?? $amount);
+            $cChange = floatval($r['change_given'] ?? 0);
+
+            if ($methodKey === 'efectivo' && $cChange > 0) {
+                $changeGiven += $cChange;
             }
-            if (($r['method'] ?? '') === 'virtual') {$virtualReceived = floatval($r['amount'] ?? 0);
-            }
+
+            $paymentsList[] = [
+                'method' => $methodKey,
+                'amount' => $amount,
+                'cash_received' => $cReceived,
+                'change_given' => $cChange
+            ];
+            $totalPaid += $amount;
         }
-    } catch (Exception$e) {}
+    } catch (Exception $e) {}
 }
 
 // --- QR ---
-$qrContent = "Factura:".($invoiceData['number'] ?? '')." | Fecha:".($invoiceData['date'] ?? '');
+$qrContent = "Factura:".($invoiceData['number'] ?? '')." | Fecha:".($invoiceData['date'] ?? '')." | NIT:".($company['nit'] ?? '');
 if ($branchIdForQr) $qrContent .= " | Sucursal:{$branchIdForQr}";
 $qrUrl = "https://chart.googleapis.com/chart?chs=150x150&cht=qr&chl=" . rawurlencode($qrContent) . "&choe=UTF-8";
 
@@ -717,7 +731,9 @@ $html .= "</head><body>";
 $html .= "<div class='print-area'>";
 
 // Encabezado con logo y datos
-if (!empty($company['logo'] ?? '')) {$logoEsc = htmlspecialchars($company['logo'] ?? '');$html .= "<div class='center'><img src='{$logoEsc}' alt='Logo' class='logo'></div>";
+if (!empty($company['logo'] ?? '')) {
+    $logoEsc = htmlspecialchars($company['logo'] ?? '');
+    $html .= "<div class='center'><img src='{$logoEsc}' alt='Logo' class='logo'></div>";
 }
 $html .= "<div class='center' style='font-weight:bold;font-size:14px;color:#000;'>".htmlspecialchars($company['name'] ?? '')."</div>";
 $html .= "<div class='center small' style='color:#000;'>NIT: ".htmlspecialchars($company['nit'] ?? '')."</div>";
@@ -727,10 +743,29 @@ if (!empty($company['phone'] ?? '')) {$html .= "<div class='center small' style=
 $html .= "<div class='center'><img src='{$qrUrl}' alt='QR' class='qr'></div>";
 
 $html .= "<div class='sep'></div>";
+
+// SI LA FACTURA ESTÁ ANULADA: MOSTRAR BANNER DESTACADO
+if ($orderRow && ($orderRow['status'] ?? '') === 'cancelado') {$html .= "<div class='center' style='font-size:13px; color:#d9534f; border:2px solid #d9534f; padding:4px; margin:4px 0; font-weight:900;'>";
+    $html .= "*** FACTURA ANULADA ***";
+    $html .= "</div>";
+}
+
 $html .= "<div class='small'>Factura: <strong>".htmlspecialchars($invoiceData['number'] ?? '')."</strong></div>";
 $html .= "<div class='small'>Fecha: <strong style='color:#000;'>".htmlspecialchars($invoiceData['date'] ?? '')."</strong></div>";
 $html .= "<div class='small'>Cajero: <strong style='color:#000;'>".htmlspecialchars($invoiceData['cashier'] ?? '')."</strong></div>";
-$html .= "<div class='small'>Cliente: <strong style='color:#000;'>".htmlspecialchars($invoiceData['customer'] ?? '')."</strong></div>";
+
+$html .= "<div class='sep'></div>";
+
+// DATOS DEL CLIENTE (SOPORTE FACTURACIÓN ELECTRÓNICA / DIAN)
+$html .= "<div class='small'>Cliente: <strong style='color:#000;'>".htmlspecialchars($invoiceData['customer_name'])."</strong></div>";
+if (!empty($invoiceData['customer_doc_num'])) {$html .= "<div class='small'>".htmlspecialchars($invoiceData['customer_doc_type']).": <strong style='color:#000;'>".htmlspecialchars($invoiceData['customer_doc_num'])."</strong></div>";
+}
+if (!empty($invoiceData['customer_phone'])) {$html .= "<div class='small'>Teléfono: <strong style='color:#000;'>".htmlspecialchars($invoiceData['customer_phone'])."</strong></div>";
+}
+if (!empty($invoiceData['customer_email'])) {$html .= "<div class='small'>Email: <strong style='color:#000;'>".htmlspecialchars($invoiceData['customer_email'])."</strong></div>";
+}
+if (!empty($invoiceData['customer_address'])) {$html .= "<div class='small'>Dirección: <strong style='color:#000;'>".htmlspecialchars($invoiceData['customer_address'])."</strong></div>";
+}
 
 // Items
 $html .= "<table class='items tiny'><tbody>{$itemsHtml}</tbody></table>";
@@ -742,15 +777,36 @@ if ($taxRate > 0) {$html .= "<div class='small'>IVA: $".number_format($tax,0,","
 }
 $html .= "<div class='total'>TOTAL: $".number_format($total,0,",",".")."</div>";
 
-// Mostrar pagos
-if ($cashReceived > 0) {$html .= "<div class='small'>Efectivo recibido: $".number_format($cashReceived,0,",",".")."</div>";
+$html .= "<div class='sep'></div>";
+
+// Mostrar Desglose Detallado de Pagos
+if (!empty($paymentsList)) {
+    foreach ($paymentsList as$p) {
+        $mKey =$p['method'];
+        if ($mKey === 'efectivo') {$html .= "<div class='small'>Efectivo recibido: $".number_format($p['cash_received'],0,",",".")."</div>";
+        } else if ($mKey === 'nequi') {$html .= "<div class='small'>Pago Nequi: $".number_format($p['amount'],0,",",".")."</div>";
+        } else if ($mKey === 'daviplata') {$html .= "<div class='small'>Pago DaviPlata: $".number_format($p['amount'],0,",",".")."</div>";
+        } else if ($mKey === 'tarjeta') {$html .= "<div class='small'>Pago Tarjeta/Transf.: $".number_format($p['amount'],0,",",".")."</div>";
+        } else {
+            $html .= "<div class='small'>Pago ".htmlspecialchars(ucwords($mKey)).": $".number_format($p['amount'],0,",",".")."</div>";
+        }
+    }
 }
-if ($virtualReceived > 0) {$html .= "<div class='small'>Pago virtual: $".number_format($virtualReceived,0,",",".")."</div>";
-}
-if ($changeGiven <= 0 && ($cashReceived > 0 ||$virtualReceived > 0)) {
-    $changeGiven = max(0,$cashReceived + $virtualReceived -$total);
-}
+
 if ($changeGiven > 0) {$html .= "<div class='small'>Vuelto: $".number_format($changeGiven,0,",",".")."</div>";
+}
+
+// SI LA FACTURA ESTÁ ANULADA: DETALLES DE AUDITORÍA Y MOTIVO CONTABLE
+if ($orderRow && ($orderRow['status'] ?? '') === 'cancelado') {$html .= "<div class='sep'></div>";
+    $html .= "<div class='small' style='color:#d9534f;'><strong>SOPORTE DE ANULACIÓN</strong></div>";
+    if (!empty($orderRow['cancelled_at'])) {$html .= "<div class='tiny'>Fecha Anulación: ".htmlspecialchars($orderRow['cancelled_at'])."</div>";
+    }
+    if (!empty($orderRow['cancelled_by_name'])) {$html .= "<div class='tiny'>Anulado por: ".htmlspecialchars($orderRow['cancelled_by_name'])."</div>";
+    }
+    if (!empty($orderRow['cancel_reason'])) {$html .= "<div class='tiny'>Motivo: ".htmlspecialchars($orderRow['cancel_reason'])."</div>";
+    }
+    if (!empty($orderRow['replacement_order'])) {$html .= "<div class='tiny'>Cambiación por Factura #: ".htmlspecialchars($orderRow['replacement_order'])."</div>";
+    }
 }
 
 $html .= "<div class='sep'></div>";
@@ -759,31 +815,23 @@ $html .= "<div style='height:20px;'></div>";
 
 // Botones de acción (ocultos al imprimir)
 $html .= "<div class='no-print' style='margin-top:10px; text-align:center;'>
-            <button onclick='window.print()' style='padding:10px 14px;border-radius:6px;'>Imprimir</button>
+            <button onclick='window.print()' style='padding:10px 14px;border-radius:6px;'>Imprimir Soporte</button>
             <button onclick='window.close()' style='padding:8px 12px;border-radius:6px;'>Cerrar</button>
           </div>";
 
-// Temporizador de autodestrucción/cierre en 60s
 $html .= "<script>setTimeout(function(){try{window.close();}catch(e){}},60000);</script>";
 
 $html .= "</div>";
 $html .= "</body></html>";
 
-// Guardar copia HTML en cash_sessions u orders según el origen
+// Guardar copia HTML
 try {
     if (!empty($orderId) &&$orderId > 0) {
         $stmtSaveOrder =$pdo->prepare("UPDATE orders SET printed_invoice_html = ?, printed_at = NOW() WHERE id = ?");
         $stmtSaveOrder->execute([$html,$orderId]);
-    } elseif (!empty($sessionId) &&$sessionId > 0) {
-        $stmtSave =$pdo->prepare("UPDATE cash_sessions SET printed_invoice_html = ?, printed_at = NOW() WHERE id = ?");
-        $stmtSave->execute([$html,$sessionId]);
     }
 } catch (Exception $e) {}
 
 // Entregar HTML al navegador
 echo $html;
-exit;
-
-// Si no hay parámetros válidos
-echo "Parámetro inválido. Use order_id, session_id, gasto_id o purchase_id.";
 exit;
