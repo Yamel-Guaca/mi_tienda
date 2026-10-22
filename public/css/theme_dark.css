@@ -1,0 +1,192 @@
+/* ===========================
+   TEMA OSCURO PARA EL POS
+   Activado con: body.dark
+=========================== */
+
+body.dark {
+    background-color: #121212;
+    color: #e5e5e5;
+}
+
+/* HEADER */
+body.dark header {
+    background-color: #1e1e1e;
+    border-bottom: 1px solid #333;
+}
+
+body.dark header h2 {
+    color: #fff;
+}
+
+body.dark .header-right .btn,
+body.dark .toggle-btn {
+    background-color: #333;
+    color: #fff;
+    border: 1px solid #444;
+}
+
+body.dark .toggle-btn:hover,
+body.dark .header-right .btn:hover {
+    background-color: #444;
+}
+
+/* CONTENEDOR PRINCIPAL */
+body.dark .container {
+    background-color: #181818;
+}
+
+/* TARJETAS Y CUADROS */
+body.dark .pos-item,
+body.dark .product-card,
+body.dark .card-tactil {
+    background-color: #1f1f1f;
+    border: 1px solid #333;
+    color: #e5e5e5;
+}
+
+body.dark .pos-item:hover,
+body.dark .product-card:hover,
+body.dark .card-tactil:hover {
+    background-color: #2a2a2a;
+}
+
+/* TABLAS */
+body.dark table.cart {
+    background-color: #1b1b1b;
+    color: #e5e5e5;
+}
+
+body.dark table.cart th {
+    background-color: #222;
+    color: #fff;
+}
+
+body.dark table.cart td {
+    border-color: #333;
+}
+
+/* BOTONES */
+body.dark .btn {
+    background-color: #333;
+    color: #fff;
+    border: 1px solid #444;
+}
+
+body.dark .btn:hover {
+    background-color: #444;
+}
+
+body.dark .btn-danger {
+    background-color: #8b1e1e;
+    border-color: #a22;
+}
+
+body.dark .btn-danger:hover {
+    background-color: #a22;
+}
+
+/* MODAL */
+body.dark .modal {
+    background-color: #1e1e1e;
+    color: #fff;
+    border: 1px solid #333;
+}
+
+body.dark .modal-overlay {
+    background-color: rgba(0, 0, 0, 0.7);
+}
+
+/* INPUTS */
+body.dark input,
+body.dark select {
+    background-color: #222;
+    color: #fff;
+    border: 1px solid #444;
+}
+
+body.dark input::placeholder {
+    color: #aaa;
+}
+
+/* BREADCRUMB */
+body.dark .breadcrumb span {
+    color: #ddd;
+}
+
+body.dark .breadcrumb span:hover {
+    color: #fff;
+}
+
+/* SCROLLBARS */
+body.dark ::-webkit-scrollbar {
+    width: 8px;
+}
+
+body.dark ::-webkit-scrollbar-track {
+    background: #1a1a1a;
+}
+
+body.dark ::-webkit-scrollbar-thumb {
+    background: #444;
+}
+
+body.dark ::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* ===========================
+   BOTONES TÁCTILES EN MODO CLARO
+=========================== */
+
+.pos-right .cart-actions .btn,
+.pos-right #sell-form .btn {
+    font-size: 20px;
+    padding: 14px 20px;
+    border-radius: 10px;
+    width: 100%;
+    margin-bottom: 10px;
+    font-weight: bold;
+}
+
+/* Botón rojo (Limpiar) */
+.pos-right .cart-actions .btn-danger {
+    background-color: #d9534f;
+    color: white;
+    border-color: #b52b27;
+}
+
+/* Botón Confirmar Venta */
+.pos-right #sell-form .btn {
+    background-color: #0275d8;
+    color: white;
+    border-color: #025aa5;
+}
+
+
+/* ===========================
+   BOTONES TÁCTILES EN MODO OSCURO
+=========================== */
+
+body.dark .pos-right .cart-actions .btn,
+body.dark .pos-right #sell-form .btn {
+    font-size: 20px;
+    padding: 14px 20px;
+    border-radius: 10px;
+    width: 100%;
+    margin-bottom: 10px;
+    font-weight: bold;
+}
+
+/* Botón rojo (Limpiar) en modo oscuro */
+body.dark .pos-right .cart-actions .btn-danger {
+    background-color: #8b1e1e;
+    color: white;
+    border-color: #a22;
+}
+
+/* Botón Confirmar Venta en modo oscuro */
+body.dark .pos-right #sell-form .btn {
+    background-color: #1e88e5;
+    color: white;
+    border-color: #1565c0;
+}
