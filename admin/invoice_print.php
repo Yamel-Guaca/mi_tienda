@@ -15,7 +15,7 @@ $pdo = DB::getConnection();
 date_default_timezone_set('America/Bogota'); 
 
 $fecha = new DateTime();
-$offset =$fecha->format('P');
+$offset = $fecha->format('P');
 
 try {
     $pdo->exec("SET time_zone = '$offset';");
@@ -32,7 +32,7 @@ $company = [
 ];
 
 try {
-    $stmtSet =$pdo->prepare("SELECT `key`, `value` FROM settings WHERE `key` IN ('company_name','company_nit','company_address','company_legend','company_logo','company_phone') ");
+    $stmtSet = $pdo->prepare("SELECT `key`, `value` FROM settings WHERE `key` IN ('company_name','company_nit','company_address','company_legend','company_logo','company_phone') ");
     $stmtSet->execute();
     $rows = $stmtSet->fetchAll(PDO::FETCH_ASSOC);
     foreach ($rows as $r) {
@@ -390,17 +390,19 @@ if ($closureId > 0) {
     $stmt->execute([$c['branch_id'], $opening_at, $closing_at]);
     $sales_virtual = floatval($stmt->fetchColumn());
 
+    // --- FILTRADO: EXCLUIR GASTOS ADMINISTRATIVOS ---
     $stmt = $pdo->prepare("
       SELECT COALESCE(SUM(valor),0) 
       FROM gastos g
       WHERE g.branch_id = ? 
         AND CONCAT(g.fecha, ' ', g.hora) BETWEEN ? AND ?
         AND COALESCE(g.anulado, 0) = 0
+        AND (g.tipo IS NULL OR g.tipo != 'administrativo')
     ");
     $stmt->execute([$c['branch_id'], $opening_at, $closing_at]);
     $sales_expenses = floatval($stmt->fetchColumn());
 
-    // --- NUEVO: Consulta de Compras durante la Sesión ---
+    // --- Consulta de Compras durante la Sesión ---
     $stmt = $pdo->prepare("
       SELECT COALESCE(SUM(total_amount),0) 
       FROM purchases
@@ -419,7 +421,7 @@ if ($closureId > 0) {
     $opening_display = htmlspecialchars($opening_at);
     $closing_display = htmlspecialchars($closing_at);
 
-    // --- FÓRMULA ACTUALIZADA CON COMPRAS ---
+    // --- FÓRMULA DE DIFERENCIA CORREGIDA ---
     $difference = $withdraw_amount + $sales_virtual + $sales_expenses + $sales_purchases - $sales_total;
 
     ob_start();
@@ -738,14 +740,16 @@ if (!empty($company['logo'] ?? '')) {
 $html .= "<div class='center' style='font-weight:bold;font-size:14px;color:#000;'>".htmlspecialchars($company['name'] ?? '')."</div>";
 $html .= "<div class='center small' style='color:#000;'>NIT: ".htmlspecialchars($company['nit'] ?? '')."</div>";
 $html .= "<div class='center small' style='color:#000;'>".htmlspecialchars($company['address'] ?? '')."</div>";
-if (!empty($company['phone'] ?? '')) {$html .= "<div class='center small' style='color:#000;'>Tel: ".htmlspecialchars($company['phone'] ?? '')."</div>";
+if (!empty($company['phone'] ?? '')) {
+    $html .= "<div class='center small' style='color:#000;'>Tel: ".htmlspecialchars($company['phone'] ?? '')."</div>";
 }
 $html .= "<div class='center'><img src='{$qrUrl}' alt='QR' class='qr'></div>";
 
 $html .= "<div class='sep'></div>";
 
 // SI LA FACTURA ESTÁ ANULADA: MOSTRAR BANNER DESTACADO
-if ($orderRow && ($orderRow['status'] ?? '') === 'cancelado') {$html .= "<div class='center' style='font-size:13px; color:#d9534f; border:2px solid #d9534f; padding:4px; margin:4px 0; font-weight:900;'>";
+if ($orderRow && ($orderRow['status'] ?? '') === 'cancelado') {
+    $html .= "<div class='center' style='font-size:13px; color:#d9534f; border:2px solid #d9534f; padding:4px; margin:4px 0; font-weight:900;'>";
     $html .= "*** FACTURA ANULADA ***";
     $html .= "</div>";
 }
@@ -758,13 +762,17 @@ $html .= "<div class='sep'></div>";
 
 // DATOS DEL CLIENTE (SOPORTE FACTURACIÓN ELECTRÓNICA / DIAN)
 $html .= "<div class='small'>Cliente: <strong style='color:#000;'>".htmlspecialchars($invoiceData['customer_name'])."</strong></div>";
-if (!empty($invoiceData['customer_doc_num'])) {$html .= "<div class='small'>".htmlspecialchars($invoiceData['customer_doc_type']).": <strong style='color:#000;'>".htmlspecialchars($invoiceData['customer_doc_num'])."</strong></div>";
+if (!empty($invoiceData['customer_doc_num'])) {
+    $html .= "<div class='small'>".htmlspecialchars($invoiceData['customer_doc_type']).": <strong style='color:#000;'>".htmlspecialchars($invoiceData['customer_doc_num'])."</strong></div>";
 }
-if (!empty($invoiceData['customer_phone'])) {$html .= "<div class='small'>Teléfono: <strong style='color:#000;'>".htmlspecialchars($invoiceData['customer_phone'])."</strong></div>";
+if (!empty($invoiceData['customer_phone'])) {
+    $html .= "<div class='small'>Teléfono: <strong style='color:#000;'>".htmlspecialchars($invoiceData['customer_phone'])."</strong></div>";
 }
-if (!empty($invoiceData['customer_email'])) {$html .= "<div class='small'>Email: <strong style='color:#000;'>".htmlspecialchars($invoiceData['customer_email'])."</strong></div>";
+if (!empty($invoiceData['customer_email'])) {
+    $html .= "<div class='small'>Email: <strong style='color:#000;'>".htmlspecialchars($invoiceData['customer_email'])."</strong></div>";
 }
-if (!empty($invoiceData['customer_address'])) {$html .= "<div class='small'>Dirección: <strong style='color:#000;'>".htmlspecialchars($invoiceData['customer_address'])."</strong></div>";
+if (!empty($invoiceData['customer_address'])) {
+    $html .= "<div class='small'>Dirección: <strong style='color:#000;'>".htmlspecialchars($invoiceData['customer_address'])."</strong></div>";
 }
 
 // Items
@@ -773,7 +781,8 @@ $html .= "<div class='sep'></div>";
 
 // Totales
 $html .= "<div class='small'>Subtotal: $".number_format($subtotal,0,",",".")."</div>";
-if ($taxRate > 0) {$html .= "<div class='small'>IVA: $".number_format($tax,0,",",".")."</div>";
+if ($taxRate > 0) {
+    $html .= "<div class='small'>IVA: $".number_format($tax,0,",",".")."</div>";
 }
 $html .= "<div class='total'>TOTAL: $".number_format($total,0,",",".")."</div>";
 
@@ -781,31 +790,41 @@ $html .= "<div class='sep'></div>";
 
 // Mostrar Desglose Detallado de Pagos
 if (!empty($paymentsList)) {
-    foreach ($paymentsList as$p) {
-        $mKey =$p['method'];
-        if ($mKey === 'efectivo') {$html .= "<div class='small'>Efectivo recibido: $".number_format($p['cash_received'],0,",",".")."</div>";
-        } else if ($mKey === 'nequi') {$html .= "<div class='small'>Pago Nequi: $".number_format($p['amount'],0,",",".")."</div>";
-        } else if ($mKey === 'daviplata') {$html .= "<div class='small'>Pago DaviPlata: $".number_format($p['amount'],0,",",".")."</div>";
-        } else if ($mKey === 'tarjeta') {$html .= "<div class='small'>Pago Tarjeta/Transf.: $".number_format($p['amount'],0,",",".")."</div>";
+    foreach ($paymentsList as $p) {
+        $mKey = $p['method'];
+        if ($mKey === 'efectivo') {
+            $html .= "<div class='small'>Efectivo recibido: $".number_format($p['cash_received'],0,",",".")."</div>";
+        } else if ($mKey === 'nequi') {
+            $html .= "<div class='small'>Pago Nequi: $".number_format($p['amount'],0,",",".")."</div>";
+        } else if ($mKey === 'daviplata') {
+            $html .= "<div class='small'>Pago DaviPlata: $".number_format($p['amount'],0,",",".")."</div>";
+        } else if ($mKey === 'tarjeta') {
+            $html .= "<div class='small'>Pago Tarjeta/Transf.: $".number_format($p['amount'],0,",",".")."</div>";
         } else {
             $html .= "<div class='small'>Pago ".htmlspecialchars(ucwords($mKey)).": $".number_format($p['amount'],0,",",".")."</div>";
         }
     }
 }
 
-if ($changeGiven > 0) {$html .= "<div class='small'>Vuelto: $".number_format($changeGiven,0,",",".")."</div>";
+if ($changeGiven > 0) {
+    $html .= "<div class='small'>Vuelto: $".number_format($changeGiven,0,",",".")."</div>";
 }
 
 // SI LA FACTURA ESTÁ ANULADA: DETALLES DE AUDITORÍA Y MOTIVO CONTABLE
-if ($orderRow && ($orderRow['status'] ?? '') === 'cancelado') {$html .= "<div class='sep'></div>";
+if ($orderRow && ($orderRow['status'] ?? '') === 'cancelado') {
+    $html .= "<div class='sep'></div>";
     $html .= "<div class='small' style='color:#d9534f;'><strong>SOPORTE DE ANULACIÓN</strong></div>";
-    if (!empty($orderRow['cancelled_at'])) {$html .= "<div class='tiny'>Fecha Anulación: ".htmlspecialchars($orderRow['cancelled_at'])."</div>";
+    if (!empty($orderRow['cancelled_at'])) {
+        $html .= "<div class='tiny'>Fecha Anulación: ".htmlspecialchars($orderRow['cancelled_at'])."</div>";
     }
-    if (!empty($orderRow['cancelled_by_name'])) {$html .= "<div class='tiny'>Anulado por: ".htmlspecialchars($orderRow['cancelled_by_name'])."</div>";
+    if (!empty($orderRow['cancelled_by_name'])) {
+        $html .= "<div class='tiny'>Anulado por: ".htmlspecialchars($orderRow['cancelled_by_name'])."</div>";
     }
-    if (!empty($orderRow['cancel_reason'])) {$html .= "<div class='tiny'>Motivo: ".htmlspecialchars($orderRow['cancel_reason'])."</div>";
+    if (!empty($orderRow['cancel_reason'])) {
+        $html .= "<div class='tiny'>Motivo: ".htmlspecialchars($orderRow['cancel_reason'])."</div>";
     }
-    if (!empty($orderRow['replacement_order'])) {$html .= "<div class='tiny'>Cambiación por Factura #: ".htmlspecialchars($orderRow['replacement_order'])."</div>";
+    if (!empty($orderRow['replacement_order'])) {
+        $html .= "<div class='tiny'>Cambiación por Factura #: ".htmlspecialchars($orderRow['replacement_order'])."</div>";
     }
 }
 
@@ -826,9 +845,9 @@ $html .= "</body></html>";
 
 // Guardar copia HTML
 try {
-    if (!empty($orderId) &&$orderId > 0) {
-        $stmtSaveOrder =$pdo->prepare("UPDATE orders SET printed_invoice_html = ?, printed_at = NOW() WHERE id = ?");
-        $stmtSaveOrder->execute([$html,$orderId]);
+    if (!empty($orderId) && $orderId > 0) {
+        $stmtSaveOrder = $pdo->prepare("UPDATE orders SET printed_invoice_html = ?, printed_at = NOW() WHERE id = ?");
+        $stmtSaveOrder->execute([$html, $orderId]);
     }
 } catch (Exception $e) {}
 

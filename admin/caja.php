@@ -88,25 +88,26 @@ $stmtVentasSesion = $pdo->prepare("
       AND created_at BETWEEN ? AND ?
 ");
 
-// Preparar consulta para pagos virtuales (excluye canceladas)
+// Preparar consulta para pagos virtuales / electrónicos (excluye efectivo y ventas canceladas)
 $stmtVirtual = $pdo->prepare("
     SELECT COALESCE(SUM(p.amount),0) 
     FROM payments p
     JOIN orders o ON o.id = p.order_id
-    WHERE p.method = 'virtual'
+    WHERE LOWER(p.method) != 'efectivo'
       AND p.status = 'completado'
       AND o.status != 'cancelado'
       AND o.created_at BETWEEN ? AND ?
       AND o.branch_id = ?
 ");
 
-// Gastos por sesión
+// Gastos por sesión (EXCLUYE GASTOS ADMINISTRATIVOS PARA NO AFECTAR AL CAJERO)
 $stmtGastos = $pdo->prepare("
     SELECT COALESCE(SUM(valor),0)
     FROM gastos g
     WHERE g.branch_id = ?
       AND CONCAT(g.fecha, ' ', g.hora) BETWEEN ? AND ?
       AND COALESCE(g.anulado, 0) = 0
+      AND (g.tipo IS NULL OR g.tipo != 'administrativo')
 ");
 
 // Compras por sesión (Sincronización con compras.php)
@@ -180,22 +181,21 @@ if ($action === 'close' && $currentSession) {
     $msg = "Caja cerrada correctamente. Generando reporte de cierre.";
 }
 
-// --- Re-ejecutar consultas de resumen si no hubo cierre ---
-$defaultOpenedAt = $currentSession['opened_at'] ?? date('Y-m-d H:i:s');
-$defaultClosedAt = $currentSession['closed_at'] ?? date('Y-m-d H:i:s');
+// --- Re-ejecutar consultas de resumen para la caja abierta actual ---
+if ($currentSession && !$reportSession) {
+    $defaultOpenedAt = $currentSession['opened_at'] ?? date('Y-m-d H:i:s');
+    $defaultClosedAt = date('Y-m-d H:i:s');
 
-$stmtVirtual->execute([$defaultOpenedAt, $defaultClosedAt, $currentBranchId]);
-if (empty($reportVirtualPayments)) {
+    $stmtVentasSesion->execute([$currentBranchId, $defaultOpenedAt, $defaultClosedAt]);
+    $reportVentas = (float)$stmtVentasSesion->fetchColumn();
+
+    $stmtVirtual->execute([$defaultOpenedAt, $defaultClosedAt, $currentBranchId]);
     $reportVirtualPayments = (float)$stmtVirtual->fetchColumn();
-}
 
-$stmtGastos->execute([$currentBranchId, $defaultOpenedAt, $defaultClosedAt]);
-if (empty($reportGastos)) {
+    $stmtGastos->execute([$currentBranchId, $defaultOpenedAt, $defaultClosedAt]);
     $reportGastos = (float)$stmtGastos->fetchColumn();
-}
 
-$stmtCompras->execute([$currentBranchId, $defaultOpenedAt, $defaultClosedAt]);
-if (empty($reportCompras)) {
+    $stmtCompras->execute([$currentBranchId, $defaultOpenedAt, $defaultClosedAt]);
     $reportCompras = (float)$stmtCompras->fetchColumn();
 }
 
@@ -484,6 +484,14 @@ document.addEventListener("DOMContentLoaded", () => {
         <small style="display:block; margin-top:8px; color:#666;">Para descuadre considerando ventas de la sesión, ver columna “Diferencia” en el historial.</small>
     </div>
 
+    <!-- Valores ocultos para lectura dinámica en JavaScript -->
+    <div style="display:none;">
+        <span id="ventas_sesion"><?= number_format($reportVentas,0,",",".") ?></span>
+        <span id="ventas_virtuales"><?= number_format($reportVirtualPayments,0,",",".") ?></span>
+        <span id="gastos_sesion"><?= number_format($reportGastos,0,",",".") ?></span>
+        <span id="compras_sesion"><?= number_format($reportCompras,0,",",".") ?></span>
+    </div>
+
 <?php
 if ($reportSession):
     $rep = $reportSession;
@@ -535,13 +543,6 @@ if ($reportSession):
         <tr><th>Diferencia (efectivo + virtuales + gastos + compras - ventas)</th>
             <td><?= ($difference >= 0 ? '+' : '-') . '$' . number_format(abs($difference),0,",",".") ?></td></tr>
     </table>
-
-    <div style="display:none;">
-        <span id="ventas_sesion"><?= number_format($reportVentas,0,",",".") ?></span>
-        <span id="ventas_virtuales"><?= number_format($reportVirtualPayments,0,",",".") ?></span>
-        <span id="gastos_sesion"><?= number_format($reportGastos,0,",",".") ?></span>
-        <span id="compras_sesion"><?= number_format($reportCompras,0,",",".") ?></span>
-    </div>
 
     <div style="margin-top:12px; display:flex; gap:8px;">
         <button onclick="window.open('<?= htmlspecialchars('invoice_print.php?session_id='.$rep['id'].'&width=58') ?>','_blank','noopener')">Imprimir</button>
