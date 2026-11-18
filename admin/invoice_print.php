@@ -382,10 +382,15 @@ if ($closureId > 0) {
     $stmt->execute([$c['branch_id'], $opening_at, $closing_at]);
     $sales_total = floatval($stmt->fetchColumn());
 
+    // --- FILTRADO CORREGIDO: EXCLUYE EFECTIVO Y FACTURAS CANCELADAS/ANULADAS ---
     $stmt = $pdo->prepare("
       SELECT COALESCE(SUM(p.amount),0) FROM payments p
       INNER JOIN orders o ON o.id = p.order_id
-      WHERE o.branch_id = ? AND p.method != 'efectivo' AND p.status = 'completado' AND o.created_at BETWEEN ? AND ?
+      WHERE o.branch_id = ? 
+        AND LOWER(p.method) != 'efectivo' 
+        AND p.status = 'completado' 
+        AND o.status != 'cancelado'
+        AND o.created_at BETWEEN ? AND ?
     ");
     $stmt->execute([$c['branch_id'], $opening_at, $closing_at]);
     $sales_virtual = floatval($stmt->fetchColumn());
@@ -402,12 +407,12 @@ if ($closureId > 0) {
     $stmt->execute([$c['branch_id'], $opening_at, $closing_at]);
     $sales_expenses = floatval($stmt->fetchColumn());
 
-    // --- Consulta de Compras durante la Sesión ---
+    // --- Consulta de Compras durante la Sesión (sincronizada por created_at) ---
     $stmt = $pdo->prepare("
       SELECT COALESCE(SUM(total_amount),0) 
       FROM purchases
       WHERE branch_id = ? 
-        AND purchase_date BETWEEN DATE(?) AND DATE(?)
+        AND created_at BETWEEN ? AND ?
     ");
     $stmt->execute([$c['branch_id'], $opening_at, $closing_at]);
     $sales_purchases = floatval($stmt->fetchColumn());
