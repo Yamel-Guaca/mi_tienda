@@ -1,7 +1,7 @@
 <?php
 /**
- * Módulo de Gestión de Productos
- * Permite listar, crear, editar, eliminar y gestionar precios e imágenes por presentación.
+- Módulo de Gestión de Productos
+- Permite listar, crear, editar, eliminar y gestionar precios e imágenes por presentación.
  */
 
 // ==========================================
@@ -496,17 +496,32 @@ function updateTierImagePreview() {
 if (!empty($edit_price_tiers) && is_array($edit_price_tiers) && isset($edit_product)) {
     $ctx_cost = floatval($edit_product['cost_initial'] ?? 0);
     $ctx_pack_qty = max(1, intval($edit_product['packaging_qty'] ?? 1));
+    $ctx_has_inner = !empty($edit_product['has_inner_units']);
+    $ctx_inner_qty = ($ctx_has_inner && !empty($edit_product['inner_unit_qty'])) ? max(1, intval($edit_product['inner_unit_qty'])) : 1;
     $ctx_rounding = !empty($edit_product['rounding_enabled']);
-    $jsTiers = array_map(function($r) use ($ctx_cost, $ctx_pack_qty, $ctx_rounding) {
+
+    $jsTiers = array_map(function($r) use ($ctx_cost, $ctx_pack_qty, $ctx_has_inner, $ctx_inner_qty, $ctx_rounding) {
         $price = number_format((float)$r['price'], 2, '.', '');
         $margin = number_format((float)($r['margin_percent'] ?? 0), 2, '.', '');
         $t_iva = number_format((float)($r['iva_percent'] ?? 0), 2, '.', '');
-        $expected = calculate_price_from_margin($ctx_cost, $ctx_pack_qty, floatval($t_iva), floatval($margin), $ctx_rounding);
-        $autoFlag = abs(floatval($price) - floatval($expected)) < 0.01 && floatval($margin) > 0;
+        $qty = max(1, intval($r['quantity'] ?? 1));
+        $level = $r['unit_level'] ?? 'inner';
+
+        $costPackage = $ctx_cost / $ctx_pack_qty;
+        $costIndividual = $ctx_has_inner ? ($costPackage / $ctx_inner_qty) : $costPackage;
+        $baseCost = ($level === 'individual') ? $costIndividual : $costPackage;
+
+        $expected = ($baseCost * $qty) * (1 + floatval($t_iva) / 100.0) * (1 + floatval($margin) / 100.0);
+        if ($ctx_rounding) {
+            $expected = ceil($expected / 100.0) * 100.0;
+        }
+
+        $autoFlag = floatval($margin) > 0 && abs(floatval($price) - $expected) < 1.0;
+
         return [
             'label'          => $r['unit_label'],
-            'level'          => $r['unit_level'] ?? 'package',
-            'quantity'       => intval($r['quantity']),
+            'level'          => $level,
+            'quantity'       => $qty,
             'price'          => $price,
             'margin'         => $margin,
             'category_id'    => $r['category_id'] ?? null,
@@ -582,6 +597,14 @@ function updatePriceCalc(){
     if (catEl && subEl) {
         catEl.addEventListener('change', () => {
             loadSubcategories(catEl.value, subEl);
+        });
+    }
+
+    if (marginEl && priceEl) {
+        marginEl.addEventListener('input', () => {
+            if (parseFloat(marginEl.value || 0) > 0) {
+                priceEl.value = '';
+            }
         });
     }
 
@@ -753,11 +776,15 @@ function updatePriceCalc(){
             return alert('Ingrese etiqueta y cantidad válidas.');
         }
 
-        if (price <= 0 && margin > 0) {
-            const c = ctx();
-            const tierIva = parseFloat(ivaEl?.value || c.iva);
-            price = calc(c.cost, c.pack, tierIva, margin, level, qty);
-            auto = true;
+        const c = ctx();
+        const tierIva = ivaEl?.value !== '' ? parseFloat(ivaEl.value) : c.iva;
+
+        if (margin > 0) {
+            const calculatedPrice = calc(c.cost, c.pack, tierIva, margin, level, qty);
+            if (price <= 0 || Math.abs(price - calculatedPrice) < 0.01) {
+                price = calculatedPrice;
+                auto = true;
+            }
         }
 
         if (price <= 0) {
@@ -798,12 +825,19 @@ function updatePriceCalc(){
 
     window.updateTiersPrices = function() {
         const c = ctx();
+        const hasInner = document.getElementById('has_inner_units')?.value === '1';
 
         tiers = tiers.map(t => {
             const margin = parseFloat(t.margin || 0);
+            if (!hasInner && t.level === 'individual') {
+                t.level = 'inner';
+            }
 
             if (t.auto && margin > 0) {
-                const tierIva = parseFloat(t.iva_percent || c.iva) || 0;
+                const tierIva = (t.iva_percent !== undefined && t.iva_percent !== null && parseFloat(t.iva_percent) > 0)
+                    ? parseFloat(t.iva_percent)
+                    : c.iva;
+
                 t.price = calc(
                     c.cost,
                     c.pack,

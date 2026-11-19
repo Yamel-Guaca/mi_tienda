@@ -654,6 +654,7 @@ Sucursal: <strong><?=htmlspecialchars($currentBranchName,ENT_QUOTES,'UTF-8')?></
 <a href="/mi_tienda/admin/caja.php">Caja</a>
 <a href="/mi_tienda/admin/invoices_list.php">Facturas</a>
 <a href="#">Traslado de Mercancía</a>
+<a href="/mi_tienda/admin/cierre_corresponsal.php">Cierre Corresponsal</a>
 <a href="/mi_tienda/admin/dashboard.php">Administrador</a>
 <a href="/mi_tienda/admin/inventario_bajo.php">Inventario Bajo</a>
 <a href="/mi_tienda/admin/gastos.php">Gastos Local</a>

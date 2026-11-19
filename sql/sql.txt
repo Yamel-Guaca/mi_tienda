@@ -292,3 +292,126 @@ WHERE customer_id IS NULL;
 
 
 ...........todo hasta aqui cargado........versio 1.1
+
+
+CREATE TABLE IF NOT EXISTS `web_categories` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(100) NOT NULL,
+  `sort_order` INT NOT NULL DEFAULT 0,
+  `active` TINYINT(1) NOT NULL DEFAULT 1,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `web_category_products` (
+  `web_category_id` INT NOT NULL,
+  `product_id` INT NOT NULL,
+  PRIMARY KEY (`web_category_id`, `product_id`),
+  CONSTRAINT `fk_wcp_category` FOREIGN KEY (`web_category_id`) REFERENCES `web_categories` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_wcp_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
+creacion de base de datos del corresponsal para cierre del local
+
+-- 1. Configuración general del corresponsal (Base / Cupo inicial)
+CREATE TABLE IF NOT EXISTS `corresponsal_config` (
+  `id` INT PRIMARY KEY DEFAULT 1,
+  `base_amount` DECIMAL(15,2) NOT NULL DEFAULT 10000000.00,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT IGNORE INTO `corresponsal_config` (`id`, `base_amount`) VALUES (1, 10000000.00);
+
+-- 2. Columnas dinámicas (Nequi, Daviplata, Yamel, Punto Red, etc.)
+CREATE TABLE IF NOT EXISTS `corresponsal_columns` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(100) NOT NULL,
+  `sort_order` INT NOT NULL DEFAULT 0,
+  `active` TINYINT(1) NOT NULL DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO `corresponsal_columns` (`name`, `sort_order`, `active`) VALUES
+('NEQUI', 1, 1),
+('DAVIPLATA', 2, 1),
+('YAMEL', 3, 1),
+('PUNTO RED', 4, 1),
+('BETMOVIL', 5, 1),
+('PTM', 6, 1),
+('LOCAL 2', 7, 1);
+
+-- 3. Cierres diarios principales
+CREATE TABLE IF NOT EXISTS `corresponsal_closures` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `closure_date` DATE NOT NULL UNIQUE,
+  `branch_id` INT NULL,
+  `user_id` INT NULL,
+  `total_coins` DECIMAL(15,2) NOT NULL DEFAULT 0,
+  `total_bills` DECIMAL(15,2) NOT NULL DEFAULT 0,
+  `total_cash` DECIMAL(15,2) NOT NULL DEFAULT 0,
+  `total_platforms` DECIMAL(15,2) NOT NULL DEFAULT 0,
+  `subtotal_cash_platforms` DECIMAL(15,2) NOT NULL DEFAULT 0,
+  `total_system` DECIMAL(15,2) NOT NULL DEFAULT 0,
+  `grand_total` DECIMAL(15,2) NOT NULL DEFAULT 0,
+  `base_snapshot` DECIMAL(15,2) NOT NULL DEFAULT 10000000.00,
+  `recaudo` DECIMAL(15,2) NOT NULL DEFAULT 0,
+  `transactions_count` INT NOT NULL DEFAULT 0,
+  `notes` VARCHAR(255) NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 4. Valores ingresados por cada columna dinámica en cada cierre
+CREATE TABLE IF NOT EXISTS `corresponsal_closure_values` (
+  `closure_id` INT NOT NULL,
+  `column_id` INT NOT NULL,
+  `amount` DECIMAL(15,2) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`closure_id`, `column_id`),
+  CONSTRAINT `fk_ccv_closure` FOREIGN KEY (`closure_id`) REFERENCES `corresponsal_closures` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_ccv_column` FOREIGN KEY (`column_id`) REFERENCES `corresponsal_columns` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 5. Arqueo detallado de monedas y billetes (Auditoría)
+CREATE TABLE IF NOT EXISTS `corresponsal_cash_counts` (
+  `closure_id` INT NOT NULL,
+  `denomination` INT NOT NULL,
+  `cash_type` ENUM('coin', 'bill') NOT NULL,
+  `quantity` INT NOT NULL DEFAULT 0,
+  `subtotal` DECIMAL(15,2) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`closure_id`, `denomination`, `cash_type`),
+  CONSTRAINT `fk_ccc_closure` FOREIGN KEY (`closure_id`) REFERENCES `corresponsal_closures` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS corresponsal_extra_arqueos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    arqueo_date DATE NOT NULL,
+    branch_id INT NULL,
+    user_id INT NULL,
+    label VARCHAR(100) NOT NULL DEFAULT 'Arqueo Adicional',
+    total_coins DECIMAL(15,2) NOT NULL DEFAULT 0,
+    total_bills DECIMAL(15,2) NOT NULL DEFAULT 0,
+    total_cash DECIMAL(15,2) NOT NULL DEFAULT 0,
+    notes VARCHAR(255) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_arqueo_date (arqueo_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS corresponsal_extra_arqueo_counts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    extra_arqueo_id INT NOT NULL,
+    denomination INT NOT NULL,
+    cash_type ENUM('coin','bill') NOT NULL,
+    quantity INT NOT NULL DEFAULT 0,
+    subtotal DECIMAL(15,2) NOT NULL DEFAULT 0,
+    CONSTRAINT fk_extra_arqueo_counts
+        FOREIGN KEY (extra_arqueo_id) REFERENCES corresponsal_extra_arqueos(id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
+...........todo hasta aqui cargado........versio 1.2
+
+
+
+

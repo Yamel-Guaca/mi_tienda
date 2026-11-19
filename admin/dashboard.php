@@ -174,6 +174,9 @@ try {
     <a href="/mi_tienda/admin/compras.php" class="quick-btn quick-btn-success">🛒 Ir a Compras</a>
     <a href="/mi_tienda/admin/permisos.php" class="quick-btn quick-btn-success">Ir a Permisos</a>
     <a href="/mi_tienda/admin/gastos_administrativos.php" class="quick-btn quick-btn-success">Gastos Administrativos</a>
+    <a href="/mi_tienda/admin/categorias_web.php" class="quick-btn quick-btn-success">Categorias Web</a>
+    <a href="/mi_tienda/admin/cierre_corresponsal.php" class="quick-btn quick-btn-success">Cierre Corresponsal</a>
+    <a href="/mi_tienda/admin/reporte_corresponsal.php" class="quick-btn quick-btn-success">Reporte Corresponsal</a>
     
 </div>
 

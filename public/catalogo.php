@@ -1,5 +1,5 @@
 <?php
-// catalogo.php - Catálogo Virtual Integrado y Corregido
+// catalogo.php - Catálogo Virtual Integrado con Categorías Web Personalizadas
 require_once __DIR__ . '/../includes/db.php';
 
 try {
@@ -14,26 +14,15 @@ $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
 $offset = ($page - 1) * $perPage;
 $q = isset($_GET['q']) ? trim($_GET['q']) : '';
 
-// --- Parámetros de Categoría y Subcategoría ---
+// --- Parámetro de Categoría Web ---
 $catId = isset($_GET['cat']) ? intval($_GET['cat']) : 0;
-$subId = isset($_GET['sub']) ? intval($_GET['sub']) : 0;
 
-// --- Consultar lista de Categorías activas ---
+// --- Consultar lista de Categorías Web creadas por el administrador ---
 $categories = [];
 try {
-    $stmtCat = $pdo->query("SELECT id, name FROM categories ORDER BY name ASC");
+    $stmtCat = $pdo->query("SELECT id, name FROM web_categories WHERE active = 1 ORDER BY sort_order ASC, name ASC");
     $categories = $stmtCat->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {}
-
-// --- Consultar lista de Subcategorías si hay una categoría seleccionada ---
-$subcategories = [];
-if ($catId > 0) {
-    try {
-        $stmtSub = $pdo->prepare("SELECT id, name FROM subcategories WHERE category_id = ? ORDER BY name ASC");
-        $stmtSub->execute([$catId]);
-        $subcategories = $stmtSub->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Exception $e) {}
-}
 
 // --- Filtros SQL ---
 $where = [];
@@ -43,24 +32,32 @@ $params = [];
 $where[] = "p.visible_web = 1";
 $where[] = "p.active = 1";
 
-// BUSCADOR CORREGIDO: Busca por Nombre, SKU, Categoría y Subcategoría
+// BUSCADOR: Busca por Nombre, SKU, Categoría interna/subcategoría o Categoría Web
 if ($q !== '') {
-    $where[] = "(p.name LIKE :q1 OR p.sku LIKE :q2 OR c.name LIKE :q3 OR s.name LIKE :q4)";
+    $where[] = "(
+        p.name LIKE :q1 
+        OR p.sku LIKE :q2 
+        OR c.name LIKE :q3 
+        OR s.name LIKE :q4
+        OR p.id IN (
+            SELECT wcp.product_id 
+            FROM web_category_products wcp 
+            JOIN web_categories wc ON wc.id = wcp.web_category_id 
+            WHERE wc.name LIKE :q5
+        )
+    )";
     $qParam = '%' . $q . '%';
     $params[':q1'] = $qParam;
     $params[':q2'] = $qParam;
     $params[':q3'] = $qParam;
     $params[':q4'] = $qParam;
+    $params[':q5'] = $qParam;
 }
 
+// FILTRO POR CATEGORÍA WEB PERSONALIZADA
 if ($catId > 0) {
-    $where[] = "p.category_id = :catId";
+    $where[] = "p.id IN (SELECT product_id FROM web_category_products WHERE web_category_id = :catId)";
     $params[':catId'] = $catId;
-}
-
-if ($subId > 0) {
-    $where[] = "p.subcategory_id = :subId";
-    $params[':subId'] = $subId;
 }
 
 if (isset($_GET['stock']) && $_GET['stock'] !== '') {
@@ -104,8 +101,12 @@ $sql = "
         p.*,
         COALESCE(p.price_unit, p.price, 0) AS price,
         COALESCE(inv.stock, 0) AS stock,
-        c.name AS category_name,
-        s.name AS subcategory_name,
+        (
+            SELECT GROUP_CONCAT(wc.name SEPARATOR ', ')
+            FROM web_category_products wcp
+            JOIN web_categories wc ON wc.id = wcp.web_category_id
+            WHERE wcp.product_id = p.id AND wc.active = 1
+        ) AS web_categories_names,
         (
             SELECT filename 
             FROM product_images 
@@ -221,15 +222,11 @@ function safe_json_attr($data) {
     nav { display: flex; gap: 6px; align-items: center; }
     .btn-cart { background: var(--amarillo) !important; color: var(--azul-dark) !important; font-weight: 700 !important; padding: 9px 16px !important; border-radius: 6px; text-decoration: none; }
 
-    /* MENÚ DE CATEGORÍAS Y SUBCATEGORÍAS */
+    /* MENÚ DE CATEGORÍAS WEB */
     .cat-nav-bar { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 10px 0; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
     .cat-list { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
     .cat-item { padding: 6px 14px; border-radius: 20px; background: #f1f5f9; color: #334155; text-decoration: none; font-size: 13px; font-weight: 600; white-space: nowrap; transition: all 0.2s; }
     .cat-item:hover, .cat-item.active { background: var(--azul); color: #fff; }
-    
-    .subcat-list { display: flex; gap: 6px; overflow-x: auto; padding-top: 8px; border-top: 1px dashed #cbd5e1; margin-top: 8px; }
-    .subcat-item { padding: 4px 10px; border-radius: 14px; background: #fff; border: 1px solid #cbd5e1; color: #475569; text-decoration: none; font-size: 12px; font-weight: 500; white-space: nowrap; }
-    .subcat-item:hover, .subcat-item.active { background: var(--amarillo); color: var(--azul-dark); border-color: var(--amarillo); font-weight: 700; }
 
     /* CARRUSEL DE BANNERS */
     .hero-banner-carousel { position: relative; width: 100%; margin-bottom: 24px; overflow: hidden; border-radius: 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); background: #000; }
@@ -300,7 +297,7 @@ function safe_json_attr($data) {
       <form id="searchForm" method="GET" action="catalogo.php">
         <input id="searchInput" name="q" type="search" placeholder="Buscar por producto, SKU, categoría..." value="<?= htmlspecialchars($q) ?>">
         <button type="submit">Buscar</button>
-        <?php if (!empty($q) || $catId > 0 || $subId > 0): ?>
+        <?php if (!empty($q) || $catId > 0): ?>
           <a href="catalogo.php" class="btn-clear-search" title="Limpiar filtros">✕</a>
         <?php endif; ?>
       </form>
@@ -312,28 +309,17 @@ function safe_json_attr($data) {
   </div>
 </header>
 
-<!-- BARRA DE NAVEGACIÓN DE CATEGORÍAS Y SUBCATEGORÍAS -->
+<!-- BARRA DE NAVEGACIÓN DE CATEGORÍAS WEB PERSONALIZADAS -->
 <div class="cat-nav-bar">
   <div class="wrap">
     <div class="cat-list">
       <a href="catalogo.php<?= !empty($q) ? '?q='.urlencode($q) : '' ?>" class="cat-item <?= $catId === 0 ? 'active' : '' ?>">Todas las categorías</a>
       <?php foreach ($categories as $c): ?>
-        <a href="catalogo.php?cat=<?= $c['id'] ?><?= !empty($q) ? '&q='.urlencode($q) : '' ?>" class="cat-item <?= $catId == $c['id'] ? 'active' : '' ?>">
+        <a href="catalogo.php?cat=<?= (int)$c['id'] ?><?= !empty($q) ? '&q='.urlencode($q) : '' ?>" class="cat-item <?= $catId == $c['id'] ? 'active' : '' ?>">
           <?= htmlspecialchars($c['name']) ?>
         </a>
       <?php endforeach; ?>
     </div>
-
-    <?php if (!empty($subcategories)): ?>
-      <div class="subcat-list">
-        <a href="catalogo.php?cat=<?= $catId ?><?= !empty($q) ? '&q='.urlencode($q) : '' ?>" class="subcat-item <?= $subId === 0 ? 'active' : '' ?>">Todas las subcategorías</a>
-        <?php foreach ($subcategories as$s): ?>
-          <a href="catalogo.php?cat=<?= $catId ?>&sub=<?= $s['id'] ?><?= !empty($q) ? '&q='.urlencode($q) : '' ?>" class="subcat-item <?= $subId ==$s['id'] ? 'active' : '' ?>">
-            <?= htmlspecialchars($s['name']) ?>
-          </a>
-        <?php endforeach; ?>
-      </div>
-    <?php endif; ?>
   </div>
 </div>
 
@@ -345,7 +331,7 @@ function safe_json_attr($data) {
       <button class="hero-prev-btn" onclick="moveHeroSlide(-1)">&#10094;</button>
       
       <div class="hero-banner-slides" id="heroBannerSlides">
-        <?php foreach ($bannerImages as$img): ?>
+        <?php foreach ($bannerImages as $img): ?>
           <div class="hero-slide">
             <img src="<?= htmlspecialchars($img['src']) ?>" alt="<?= htmlspecialchars($img['alt']) ?>" loading="lazy">
           </div>
@@ -355,7 +341,7 @@ function safe_json_attr($data) {
       <button class="hero-next-btn" onclick="moveHeroSlide(1)">&#10095;</button>
 
       <div class="hero-carousel-dots" id="heroCarouselDots">
-        <?php foreach ($bannerImages as $idx =>$img): ?>
+        <?php foreach ($bannerImages as $idx => $img): ?>
           <span class="hero-dot <?= $idx === 0 ? 'active' : '' ?>" onclick="goToHeroSlide(<?= $idx ?>)"></span>
         <?php endforeach; ?>
       </div>
@@ -370,41 +356,43 @@ function safe_json_attr($data) {
         <a href="catalogo.php" style="display: inline-block; margin-top: 14px; padding: 8px 16px; background: var(--amarillo); color: var(--azul-dark); font-weight: 700; border-radius: 6px; text-decoration: none;">Ver todo el catálogo</a>
       </div>
     <?php else: ?>
-      <?php foreach ($products as$p): 
+      <?php foreach ($products as $p): 
         $pId = (int)$p['id'];
-        $images = [];$imageMap = [];
+        $images = [];
+        $imageMap = [];
 
         if (!empty($p['images_list'])) {
-          foreach (explode('||', $p['images_list']) as$item) {
-            $parts = explode(':',$item, 2);
+          foreach (explode('||', $p['images_list']) as $item) {
+            $parts = explode(':', $item, 2);
             if (count($parts) === 2) {
               $imgId = (int)$parts[0];
               $f = trim($parts[1]);
               if ($f !== '') {
-                $imgPath = '/mi_tienda/uploads/products/' .$f;
-                $images[] =$imgPath;
-                $imageMap[$imgId] =$imgPath;
+                $imgPath = '/mi_tienda/uploads/products/' . $f;
+                $images[] = $imgPath;
+                $imageMap[$imgId] = $imgPath;
               }
             } else {
               $f = trim($item);
-              if ($f !== '') $images[] = '/mi_tienda/uploads/products/' .$f;
+              if ($f !== '') $images[] = '/mi_tienda/uploads/products/' . $f;
             }
           }
         }
 
-        if (empty($images))$images[] = 'https://picsum.photos/seed/noimg/600/400';
+        if (empty($images)) $images[] = 'https://picsum.photos/seed/noimg/600/400';
 
         if (!empty($p['main_image'])) {
-          $mainPath = '/mi_tienda/uploads/products/' .$p['main_image'];
-          if (($k = array_search($mainPath,$images)) !== false) array_splice($images,$k, 1);
-          array_unshift($images,$mainPath);
+          $mainPath = '/mi_tienda/uploads/products/' . $p['main_image'];
+          if (($k = array_search($mainPath, $images)) !== false) array_splice($images, $k, 1);
+          array_unshift($images, $mainPath);
         }
 
         $images = array_values(array_unique($images));
         $dataImages = safe_json_attr($images);
 
         $discountPercent = null;
-        if (isset($p['old_price']) && is_numeric($p['old_price']) && floatval($p['old_price']) > floatval($p['price']) && floatval($p['old_price']) > 0) {$discountPercent = round((1 - (floatval($p['price']) / floatval($p['old_price']))) * 100);
+        if (isset($p['old_price']) && is_numeric($p['old_price']) && floatval($p['old_price']) > floatval($p['price']) && floatval($p['old_price']) > 0) {
+          $discountPercent = round((1 - (floatval($p['price']) / floatval($p['old_price']))) * 100);
         }
 
         $tiers = $pricesByProduct[$pId] ?? [];
@@ -428,7 +416,7 @@ function safe_json_attr($data) {
           </div>
 
           <div class="carousel-thumbs">
-            <?php foreach ($images as $idx =>$img): ?>
+            <?php foreach ($images as $idx => $img): ?>
               <div class="carousel-thumb <?= $idx === 0 ? 'active' : '' ?>" data-index="<?= $idx ?>">
                 <img data-src="<?= htmlspecialchars($img) ?>" alt="thumb" loading="lazy">
               </div>
@@ -436,7 +424,9 @@ function safe_json_attr($data) {
           </div>
 
           <h4><?= htmlspecialchars($p['name']) ?></h4>
-          <p style="color:var(--dim);font-size:12px;margin-bottom:4px;"><?= htmlspecialchars($p['category_name'] ?? '') ?><?= !empty($p['subcategory_name']) ? ' / ' . htmlspecialchars($p['subcategory_name']) : '' ?></p>
+          <?php if (!empty($p['web_categories_names'])): ?>
+            <p style="color:var(--dim);font-size:12px;margin-bottom:4px;"><?= htmlspecialchars($p['web_categories_names']) ?></p>
+          <?php endif; ?>
 
           <!-- SELECTOR DE PRESENTACIONES -->
           <?php if (!empty($tiers)): ?>
@@ -449,7 +439,7 @@ function safe_json_attr($data) {
                         data-image="">
                   Unidad base ($<?= number_format($initialPrice, 2) ?>)
                 </option>
-                <?php foreach ($tiers as$t): 
+                <?php foreach ($tiers as $t): 
                   $tImg = !empty($t['image_id']) && isset($imageMap[$t['image_id']]) ? $imageMap[$t['image_id']] : '';
                 ?>
                   <option value="<?= (int)$t['id'] ?>" 
@@ -486,11 +476,11 @@ function safe_json_attr($data) {
   <?php if ($totalPages > 1): ?>
     <div class="pagination">
       <?php if ($page > 1): ?>
-        <a href="?<?= http_build_query(array_merge($_GET, ['page' =>$page - 1])) ?>">&laquo; Anterior</a>
+        <a href="?<?= http_build_query(array_merge($_GET, ['page' => $page - 1])) ?>">&laquo; Anterior</a>
       <?php endif; ?>
       <span>Página <?= $page ?> de <?= $totalPages ?></span>
-      <?php if ($page <$totalPages): ?>
-        <a href="?<?= http_build_query(array_merge($_GET, ['page' =>$page + 1])) ?>">Siguiente &raquo;</a>
+      <?php if ($page < $totalPages): ?>
+        <a href="?<?= http_build_query(array_merge($_GET, ['page' => $page + 1])) ?>">Siguiente &raquo;</a>
       <?php endif; ?>
     </div>
   <?php endif; ?>
